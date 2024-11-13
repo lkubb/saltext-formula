@@ -33,6 +33,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f  # v1.11.0
         if: ${{ inputs.test }}
         with:
+          attestations: false
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
 
@@ -51,4 +52,5 @@ jobs:
         uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f  # v1.11.0
         if: ${{ !inputs.test }}
         with:
+          attestations: false
           password: ${{ secrets.PYPI_API_TOKEN }}
