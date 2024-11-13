@@ -95,6 +95,7 @@ def data(
 
         .. code-block:: yaml
 
+            - defaults.yaml
             - Y:G@osarch
             - Y:G@os_family
             - Y:G@os
@@ -102,11 +103,14 @@ def data(
             - C@{tplroot}
             - Y:G@id
 
+        .. important::
+            ``defaults.yaml`` is always prepended to the list, you don't need to include it.
+
     parameter_dirs
         A list of default parameter directories to look up YAML parameter files in.
         Can be overridden globally or per-formula.
 
-        Defaults to ``[<tplroot>/parameters]``, where ``tplroot`` is the
+        Defaults to ``[{tplroot}/parameters]``, where ``tplroot`` is the
         first part of ``tpldir``.
 
     config_get_strategy
@@ -190,10 +194,13 @@ def data(
             config_get_strategy=config_get_strategy,
         )["values"]
 
+        if "defaults.yaml" not in map_config["sources"]:
+            map_config["sources"].insert(0, "defaults.yaml")
+
         # Generate formula configuration based on the config above.
         formula_config = stack(
             tplroot,
-            sources=["defaults.yaml"] + map_config["sources"],
+            sources=map_config["sources"],
             parameter_dirs=map_config["parameter_dirs"],
             default_merge_strategy=map_config["default_merge_strategy"],
             default_merge_lists=map_config["default_merge_lists"],
@@ -248,7 +255,7 @@ def stack(
 
     parameter_dirs
         A list of parameter directories to look up YAML files in.
-        Defaults to ``[<tplroot>/parameters, parameters]``, where ``tplroot``
+        Defaults to ``[{tplroot}/parameters, parameters]``, where ``tplroot``
         is the first part of ``tpldir``.
 
     default_values

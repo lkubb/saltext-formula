@@ -39,7 +39,7 @@ Suppose a formula installs `borg` from GitHub releases. It allows to set the `ve
 {%- endif %}
 ```
 
-## Meta Configuration
+## Meta configuration
 
 Formula authors and users can influence many aspects of the layering process:
 
@@ -165,7 +165,7 @@ query
     - `selinux!enabled/True.yaml`
     - `selinux!enabled/True.yaml.jinja`
 
-## Differences to the `template-formula`/`libmapstack.jinja`
+## Differences to `template-formula` with `libmapstack.jinja`
 ### Breaking
 * The default `slsutil.merge` and `config.get` merge strategy was looked up via `salt["config.get"]("{tplroot}:strategy")`. This behavior was dropped in favor of configuring this in `map_jinja.yaml` only. This keeps formula configuration in one place and allows to specify both strategies separately from each other.
 

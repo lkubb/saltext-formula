@@ -209,10 +209,7 @@ def test_data_configuration_override(context, cp_get_template):
     for param, val in default_formula_config.items():
         if param in ("post_map", "post_map_template", "cache"):
             continue
-        if param == "sources":
-            assert stack.call_args_list[1].kwargs[param] == ["defaults.yaml"] + val
-        else:
-            assert stack.call_args_list[1].kwargs[param] == val
+        assert stack.call_args_list[1].kwargs[param] == val
     cp_get_template.assert_called_once()
     assert (
         cp_get_template.call_args.args[0] == f"salt://tplroot/{default_formula_config['post_map']}"
@@ -224,11 +221,22 @@ def test_data_configuration_override(context, cp_get_template):
     assert not context[map_mod.CKEY]
 
 
-def test_data_no_post_map(cp_get_template):
+@pytest.fixture
+def stack_mock():
     def _stack(*args, default_values=None, **kwargs):  # pylint: disable=unused-argument
         return {"values": default_values or {}}
 
-    with patch("saltext.formula.modules.map.stack", autospec=True) as stack:
-        stack.side_effect = _stack
-        map_mod.data("tplroot/foo/bar", post_map=False)
+    with patch("saltext.formula.modules.map.stack", autospec=True, side_effect=_stack) as stack:
+        yield stack
+
+
+@pytest.mark.usefixtures("stack_mock")
+def test_data_no_post_map(cp_get_template):
+    map_mod.data("tplroot/foo/bar", post_map=False)
     cp_get_template.assert_not_called()
+
+
+@pytest.mark.usefixtures("stack_mock")
+def test_data_no_duplicate_defaults_yaml():
+    res = map_mod.data("tplroot/foo/bar", sources=["Y:G@os", "defaults.yaml", "foobar"])
+    assert res["map_jinja"]["sources"].count("defaults.yaml") == 1

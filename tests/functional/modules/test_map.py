@@ -752,6 +752,7 @@ def test_data_defaults(grains_os, grains_id, config_get_strategy, map_mod):
         "post_map": "post-map.jinja",
         "post_map_template": "jinja",
         "sources": [
+            "defaults.yaml",
             "Y:G@osarch",
             "Y:G@os_family",
             "Y:G@os",
