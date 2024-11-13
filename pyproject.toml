@@ -1,0 +1,152 @@
+[build-system]
+requires = [
+    "wheel",
+    "setuptools>=50.3.2",
+    "setuptools_scm[toml]>=3.4",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/saltext/formula/version.py"
+write_to_template = "__version__ = \"{version}\""
+
+[project]
+name = "saltext.formula"
+description = "Salt Extension providing supporting modules for formulae"
+authors = [
+    {name = "lkubb", email = "lkubb@protonmail.com"},
+]
+keywords = [
+    "salt-extension",
+]
+license = {text = "Apache Software License"}
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Cython",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+]
+requires-python = ">= 3.9"
+dynamic = ["version"]
+dependencies = [
+    "salt>=3006",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.urls]
+Homepage = "https://github.com/lkubb/saltext-formula"
+Documentation = "https://lkubb.github.io/saltext-formula/"
+Source = "https://github.com/lkubb/saltext-formula"
+Tracker = "https://github.com/lkubb/saltext-formula/issues"
+
+[project.optional-dependencies]
+changelog = ["towncrier==22.12.0"]
+dev = [
+    "nox[uv]>=2024.3",
+    "pre-commit>=2.21.0",
+]
+docs = [
+  "sphinx",
+  "sphinx-prompt",
+  "sphinxcontrib-spelling",
+  "sphinx-copybutton",
+  "towncrier==22.12.0",
+  "sphinxcontrib-towncrier",
+  "myst_parser",
+  "furo",
+  "sphinx-inline-tabs",
+]
+docsauto = ["sphinx-autobuild"]
+lint = [
+    "pylint==3.2.6",
+]
+tests = [
+    "pytest>=7.2.0",
+    "pytest-salt-factories>=1.0.0",
+]
+
+[project.entry-points."salt.loader"]
+"saltext.formula" = "saltext.formula"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+platforms = ["any"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests"]
+
+[tool.distutils.bdist_wheel]
+# Use this option if your package is pure-python
+universal = 1
+
+[tool.distutils.sdist]
+owner = "root"
+group = "root"
+
+[tool.build_sphinx]
+source_dir = "docs"
+build_dir = "build/sphinx"
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+force_single_line = true
+skip = ["src/saltext/formula/__init__.py"]
+profile = "black"
+line_length = 100
+
+[tool.towncrier]
+package = "saltext.formula"
+filename = "CHANGELOG.md"
+template = "changelog/.template.jinja"
+directory = "changelog/"
+start_string = "# Changelog\n"
+underlines = ["", "", ""]
+title_format = "## {version} ({project_date})"
+issue_format = "[#{issue}](https://github.com/lkubb/saltext-formula/issues/{issue})"
+
+[[tool.towncrier.type]]
+directory = "breaking"
+name = "Breaking changes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
