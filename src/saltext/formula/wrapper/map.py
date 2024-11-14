@@ -2,6 +2,9 @@
 SSH wrapper for the :py:mod:`map <saltext.formula.modules.map>` execution module.
 
 See there for documentation.
+
+.. important::
+    This wrapper requires the ``cp`` wrapper introduced in Salt 3007.0.
 """
 
 import logging
@@ -26,3 +29,14 @@ data = namespaced_function(data, globals())
 stack = namespaced_function(stack, globals())
 _render_matcher = namespaced_function(_render_matcher, globals())
 _render_matchers = namespaced_function(_render_matchers, globals())
+
+
+def _get_template(path, **kwargs):
+    res = __salt__["cp.get_template"](
+        f"salt://{path}",
+        "",
+        **kwargs,
+    )
+    if not res:
+        return res
+    return __salt__["cp.convert_cache_path"](res)

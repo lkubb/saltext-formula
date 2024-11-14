@@ -211,7 +211,8 @@ def data(
         formula_config["map_jinja"] = map_config
         if map_config["post_map"] is not False:
             # Just rendering the template propagates its changes to mapdata.
-            # We don't care about its output.
+            # We don't care about its output, so we don't need to ensure
+            # the path is converted in Salt-SSH either by calling _get_template.
             __salt__["cp.get_template"](
                 f"salt://{tplroot}/{map_config['post_map']}",
                 "",
@@ -327,9 +328,8 @@ def stack(
             for param_dir in parameter_dirs:
                 for yaml_name in all_yaml_names:
                     yaml_path = Path(param_dir, yaml_dirname, yaml_name)
-                    yaml_cached = __salt__["cp.get_template"](
-                        f"salt://{yaml_path}",
-                        "",
+                    yaml_cached = _get_template(
+                        yaml_path,
                         tpldir=tpldir,
                         tplroot=tplroot,
                         mapdata=res["values"],
@@ -423,3 +423,11 @@ def _render_matcher(matcher, config_get_strategy=None):
         )
 
     return parsed
+
+
+def _get_template(path, **kwargs):
+    return __salt__["cp.get_template"](
+        f"salt://{path}",
+        "",
+        **kwargs,
+    )
