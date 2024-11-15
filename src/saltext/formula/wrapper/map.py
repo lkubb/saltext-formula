@@ -11,11 +11,11 @@ import logging
 
 from salt.utils.functools import namespaced_function
 
-from saltext.formula.modules.map import _render_matcher
-from saltext.formula.modules.map import _render_matchers
-from saltext.formula.modules.map import data
-from saltext.formula.modules.map import stack
-from saltext.formula.modules.map import tofs
+from saltext.formula.modules.map import _render_matcher as _render_matcher_base
+from saltext.formula.modules.map import _render_matchers as _render_matchers_base
+from saltext.formula.modules.map import data as data_base
+from saltext.formula.modules.map import stack as stack_base
+from saltext.formula.modules.map import tofs as tofs_base
 
 log = logging.getLogger(__name__)
 
@@ -26,11 +26,24 @@ def __virtual__():
     return __virtualname__
 
 
-data = namespaced_function(data, globals())
-stack = namespaced_function(stack, globals())
-tofs = namespaced_function(tofs, globals())
-_render_matcher = namespaced_function(_render_matcher, globals())
-_render_matchers = namespaced_function(_render_matchers, globals())
+data = namespaced_function(data_base, globals())
+stack = namespaced_function(stack_base, globals())
+tofs = namespaced_function(tofs_base, globals())
+_render_matcher = namespaced_function(_render_matcher_base, globals())
+_render_matchers = namespaced_function(_render_matchers_base, globals())
+
+
+for func, base in (
+    (data, data_base),
+    (stack, stack_base),
+    (tofs, tofs_base),
+    (_render_matcher, _render_matcher_base),
+    (_render_matchers, _render_matchers_base),
+):
+    # namespaced_function does not initialize keyword-only argument defaults,
+    # making them required arguments.
+    # Starting with Python 3.13, it's possible to pass `kwdefaults` to types.FunctionType
+    func.__kwdefaults__ = base.__kwdefaults__.copy()
 
 
 def _get_template(path, **kwargs):
