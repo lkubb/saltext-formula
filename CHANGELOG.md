@@ -4,6 +4,14 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## 0.2.0 (2024-11-15)
+
+
+### Added
+
+- Added map.tofs function to mimic libtofs.jinja
+
+
 ## 0.1.1 (2024-11-14)
 
 
