@@ -49,6 +49,9 @@ QUERY_MAP = freeze(
 
 CKEY = "_formula_mapdata"
 
+# Use an object instance to track whether a query was successful or not
+UNSET = frozenset()
+
 log = logging.getLogger(__name__)
 
 __virtualname__ = "map"
@@ -61,6 +64,7 @@ def __virtual__():
 def data(
     tpldir,
     sources=None,
+    *,
     parameter_dirs=None,
     config_get_strategy=None,
     default_merge_strategy=None,
@@ -90,6 +94,7 @@ def data(
     sources
         A list of default :ref:`data source definitions <matcher-def-target>`.
         Can be overridden globally or per-formula.
+        Earlier entries have a **lower** priority (later ones are merged on top).
 
         Defaults to:
 
@@ -232,6 +237,7 @@ def data(
 def stack(
     tpldir,
     sources,
+    *,
     parameter_dirs=None,
     default_values=None,
     default_merge_strategy=None,
@@ -284,6 +290,8 @@ def stack(
     matchers = _render_matchers(sources, config_get_strategy=config_get_strategy)
 
     for matcher in matchers:
+        if matcher["value"] is UNSET:
+            continue
         if matcher["type"] in QUERY_MAP:
             stack_config = ChainMap(matcher["value"], res)
             strategy = traverse(stack_config, "strategy", default="smart")
@@ -308,14 +316,8 @@ def stack(
             if matcher["value"] is ...:
                 # A static filename was specified.
                 file_path = Path(matcher["query"])
-                yaml_dirname, yaml_names = str(file_path.parent), file_path.name
-            if isinstance(yaml_names, str):
-                yaml_names = [yaml_names]
-            else:
-                try:
-                    yaml_names = [str(name) for name in yaml_names]
-                except TypeError:
-                    yaml_names = [str(yaml_names)]
+                yaml_dirname, yaml_names = str(file_path.parent), [file_path.name]
+
             all_yaml_names = []
             for name in yaml_names:
                 file_ext = Path(name).suffix
@@ -351,7 +353,161 @@ def stack(
     return res
 
 
-def _render_matchers(matchers, config_get_strategy=None):
+def tofs(
+    tpldir,
+    source_files,
+    *,
+    lookup=None,
+    default_matchers=None,
+    use_subpath=False,
+    include_query=True,
+    path_prefix=None,
+    files_dir="files",
+    default_dir="default",
+    config=None,
+):
+    """
+    Render a list of TOFS patterns to be used as an input to states that
+    allow to specify multiple ``sources``, such as ``file.managed``.
+
+    .. note::
+
+        This function is intended to be called from templates during the rendering
+        of states, but it can be used for debugging/information purposes as well.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' map.tofs openssh '[salt.conf, salt.conf.jinja]'
+        salt '*' map.tofs openssh '[etc/salt/master, etc/salt/master.j2]'
+
+    tpldir
+        Pass ``tpldir`` from the state file.
+
+    source_files
+        A list of relative paths to render relative to all TOFS sources.
+        Earlier entries have a **higher** priority (they are searched first).
+        Required.
+
+    lookup
+        Allow users to specify alternate file names in the formula configuration
+        that are prepended to the default ``source_files`` (in ``tofs:source_files:<lookup>``).
+
+    default_matchers
+        A list of data source (matcher) definitions. Can be overridden
+        in ``tofs:files_switch``, which itself can also be overridden
+        per subpath (eg ``sub/path``), including the root one,
+        in ``<sub>:<path>:files_switch``.
+
+    use_subpath
+        When called from a state inside a nested directory, e.g. ``salt://salt/minion/config/init.sls``,
+        also try ``files_dir`` relative to each parent
+        (``salt/minion/config/files``,  ``salt/minion/files``, ``salt/files``).
+        Defaults to false.
+
+    include_query
+        Include the matcher query in the path. Defaults to true.
+        When true:  ``G@os`` -> ``files/os/Fedora/salt.conf``
+        When false: ``G@os`` -> ``files/Fedora/salt.conf``
+
+    path_prefix
+        The path prefix containing the ``files_dir``. Defaults to the first
+        part of ``tpldir``.
+
+    files_dir
+        The directory relative to ``path_prefix`` containing possible files.
+        Defaults to ``files``.
+
+    default_dir
+        The name of the directory that is used as a fallback. Defaults to ``default``.
+
+    config
+        If you have rendered the formula configuration, you can pass it here.
+        If not passed, calls :py:func:`map.data <saltext.formula.modules.map.data`
+        to fetch it.
+    """
+    tplroot = tpldir.split("/", maxsplit=1)[0]
+    if config is None:
+        config = data(tpldir)
+    if default_matchers is None:
+        default_matchers = ("id", "os_family")
+    if path_prefix is None:
+        path_prefix = tplroot
+
+    subpaths = []
+
+    # In case this was called from within a nested dir, search all parent directories
+    # for the `files_dir`.
+    if use_subpath and tplroot != tpldir:
+        for par in (Path(tpldir), *Path(tpldir).parents):
+            parent = "/".join(par.parts[1:])
+            if parent:
+                subpaths.append(f"/{parent}")
+    subpaths.append("")
+
+    default_config = {
+        "files_switch": default_matchers,
+        "path_prefix": path_prefix,
+        "dirs": {
+            "default": default_dir,
+            "files": files_dir,
+        },
+        "source_files": {},
+        "include_query": include_query,
+    }
+    tofs_config = ChainMap(config.get("tofs", {}), default_config)
+
+    if lookup is not None:
+        source_files = traverse(tofs_config, f"source_files:{lookup}", []) + source_files
+
+    base_prefix = tofs_config["path_prefix"]
+    files_dir = traverse(tofs_config, "dirs:files", files_dir)
+    default_matchers = tofs_config["files_switch"]
+    include_query = tofs_config["include_query"]
+
+    res = []
+    for subpath in subpaths:
+        override_path = "/".join(part for part in (subpath.strip("/"), "files_switch") if part)
+        matchers = traverse(config, override_path, list(default_matchers), delimiter="/")
+        if "" not in matchers:
+            matchers.append("")
+
+        for matcher in matchers:
+            if matcher:
+                matcher_res = _render_matcher(
+                    matcher,
+                    config_get_strategy=config["map_jinja"]["config_get_strategy"],
+                    for_path_rendering=True,
+                )
+                matched_values = matcher_res["value"]
+                query = matcher_res["query"]
+                if matched_values is UNSET:
+                    matched_values = [matcher_res["query"]]
+                    query = ""
+            else:
+                matched_values = [str(traverse(tofs_config, "dirs:default", default_dir))]
+                query = ""
+
+            for src_file in source_files:
+                for matched_value in matched_values:
+                    url = "/".join(
+                        part.strip("/")
+                        for part in (
+                            base_prefix,
+                            subpath,
+                            files_dir,
+                            query if include_query else "",
+                            matched_value,
+                            src_file,
+                        )
+                        if part.strip("/")
+                    )
+                    res.append(f"salt://{url}")
+    return res
+
+
+def _render_matchers(matchers, *, config_get_strategy=None, for_path_rendering=False):
     """
     Normalize a list of matcher definitions and query their values.
 
@@ -361,15 +517,27 @@ def _render_matchers(matchers, config_get_strategy=None):
     config_get_strategy
         When a ``config.get`` matcher (type ``C``) is specified,
         override the default merge strategy.
+
+    for_path_rendering
+        Ensure returned query results can be used as path segments.
+        This means the YAML matcher (``Y``) is disabled and query
+        results are cast to a list of strings.
+        Defaults to false.
     """
     parsed_matchers = []
     for matcher in matchers:
-        parsed_matchers.append(_render_matcher(matcher, config_get_strategy=config_get_strategy))
+        parsed_matchers.append(
+            _render_matcher(
+                matcher,
+                config_get_strategy=config_get_strategy,
+                for_path_rendering=for_path_rendering,
+            )
+        )
 
     return parsed_matchers
 
 
-def _render_matcher(matcher, config_get_strategy=None):
+def _render_matcher(matcher, *, config_get_strategy=None, for_path_rendering=False):
     """
     Normalize a matcher definition and execute the query.
 
@@ -379,6 +547,12 @@ def _render_matcher(matcher, config_get_strategy=None):
     config_get_strategy
         When a ``config.get`` matcher (type ``C``) is specified,
         override the default merge strategy.
+
+    for_path_rendering
+        Ensure returned query results can be used as path segments.
+        This means the YAML matcher (``Y``) is disabled and query
+        results are cast to a list of strings.
+        Defaults to false.
     """
     query, *key = matcher.split("@")
     if key:
@@ -386,6 +560,8 @@ def _render_matcher(matcher, config_get_strategy=None):
         if rest and rest[0] == "":
             # colon as delimiter was explicitly specified via Y:C::@roles
             delimiter = ":"
+        if typ == "Y" and for_path_rendering:
+            raise ValueError(f"YAML type is not allowed in this context. Got: {matcher}")
         parsed = {
             "type": typ,
             "option": option or ("C" if typ == "Y" else None),
@@ -393,6 +569,8 @@ def _render_matcher(matcher, config_get_strategy=None):
             "query": key[0],
         }
     elif query.endswith((".yaml", ".jinja")):
+        if for_path_rendering:
+            raise ValueError(f"YAML type is not allowed in this context. Got: {matcher}")
         # Static file path like defaults.yaml
         parsed = {
             "type": "Y",
@@ -406,8 +584,8 @@ def _render_matcher(matcher, config_get_strategy=None):
         # Configuration without @, example: mysql.
         # Interpret it as a YAML source with config.get query.
         parsed = {
-            "type": "Y",
-            "option": "C",
+            "type": "Y" if not for_path_rendering else "C",
+            "option": "C" if not for_path_rendering else None,
             "query_delimiter": ":",
             "query": query,
         }
@@ -418,9 +596,19 @@ def _render_matcher(matcher, config_get_strategy=None):
     if parsed["query_method"] == "config.get" and config_get_strategy:
         query_opts["merge"] = config_get_strategy
     if "value" not in parsed:
-        parsed["value"] = __salt__[parsed["query_method"]](
-            parsed["query"], default=[], **query_opts
+        query_result = __salt__[parsed["query_method"]](
+            parsed["query"], default=UNSET, **query_opts
         )
+        if query_result is not UNSET and (parsed["type"] == "Y" or for_path_rendering):
+            # Ensure we always return a list of string values when rendering paths
+            if isinstance(query_result, str):
+                query_result = [query_result]
+            else:
+                try:
+                    query_result = [str(name) for name in query_result]
+                except TypeError:
+                    query_result = [str(query_result)]
+        parsed["value"] = query_result
 
     return parsed
 

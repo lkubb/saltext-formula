@@ -12,6 +12,7 @@ import saltext.formula.modules.map as map_mod
 @pytest.fixture
 def grains():
     return {
+        "id": "testminion",
         "os": "Fedora",
         "os_family": "RedHat",
         "osfinger": "Fedora 40",
@@ -77,8 +78,12 @@ def configure_loader_modules(opts, grains, pillar, context, cp_get_template):
     "matcher,expected",
     (
         (
-            "tplroot_opts",
-            {"query_method": "config.get", "query": "tplroot_opts", "value": {"config": "data"}},
+            "roles_opts",
+            {
+                "query_method": "config.get",
+                "query": "roles_opts",
+                "value": ["opts_role_a", "opts_role_b"],
+            },
         ),
         (
             "C@tplroot_opts",
@@ -160,28 +165,63 @@ def configure_loader_modules(opts, grains, pillar, context, cp_get_template):
                 "value": ["grain_role_a", "grain_role_b"],
             },
         ),
-        ("Y:G@os", {"query_method": "grains.get", "query": "os", "value": "Fedora"}),
+        ("Y:G@os", {"query_method": "grains.get", "query": "os", "value": ["Fedora"]}),
         (
             "Y:G@selinux:enabled",
-            {"query_method": "grains.get", "query": "selinux:enabled", "value": True},
+            {"query_method": "grains.get", "query": "selinux:enabled", "value": ["True"]},
         ),
         (
             "Y:G::@selinux:enabled",
-            {"query_method": "grains.get", "query": "selinux:enabled", "value": True},
+            {"query_method": "grains.get", "query": "selinux:enabled", "value": ["True"]},
         ),
         (
             "Y:G:!@selinux!enabled",
-            {"query_method": "grains.get", "query": "selinux!enabled", "value": True},
+            {"query_method": "grains.get", "query": "selinux!enabled", "value": ["True"]},
         ),
-        ("C@nonexistent", {"query_method": "config.get", "query": "nonexistent", "value": []}),
-        ("I@nonexistent", {"query_method": "pillar.get", "query": "nonexistent", "value": []}),
-        ("G@nonexistent", {"query_method": "grains.get", "query": "nonexistent", "value": []}),
+        (
+            "C@nonexistent",
+            {"query_method": "config.get", "query": "nonexistent", "value": map_mod.UNSET},
+        ),
+        (
+            "I@nonexistent",
+            {"query_method": "pillar.get", "query": "nonexistent", "value": map_mod.UNSET},
+        ),
+        (
+            "G@nonexistent",
+            {"query_method": "grains.get", "query": "nonexistent", "value": map_mod.UNSET},
+        ),
     ),
 )
 def test_render_matcher(matcher, expected):
     res = map_mod._render_matcher(matcher)
     for param, val in expected.items():
-        assert res[param] == val
+        if param == "value" and val is map_mod.UNSET:
+            assert res[param] is val
+        else:
+            assert res[param] == val
+
+
+@pytest.mark.parametrize(
+    "matcher,expected",
+    (
+        ("roles_opts", ["opts_role_a", "opts_role_b"]),
+        ("selinux", ["enabled", "enforced"]),
+        ("selinux:enabled", ["True"]),
+        ("C::!@selinux!enabled", ["True"]),
+    ),
+)
+def test_render_matcher_for_path_rendering(matcher, expected):
+    res = map_mod._render_matcher(matcher, for_path_rendering=True)
+    assert res["query_method"] == "config.get"
+    assert res["type"] == "C"
+    assert res["query"] == matcher.split("@")[-1]
+    assert res["value"] == expected
+
+
+@pytest.mark.parametrize("matcher", ("defaults.yaml", "Y:C@roles_opts"))
+def test_render_matcher_for_path_rendering_yaml_disallowed(matcher):
+    with pytest.raises(ValueError, match=f".*not allowed in this context.*{matcher}$"):
+        map_mod._render_matcher(matcher, for_path_rendering=True)
 
 
 def test_data_configuration_override(context, cp_get_template):
@@ -240,3 +280,449 @@ def test_data_no_post_map(cp_get_template):
 def test_data_no_duplicate_defaults_yaml():
     res = map_mod.data("tplroot/foo/bar", sources=["Y:G@os", "defaults.yaml", "foobar"])
     assert res["map_jinja"]["sources"].count("defaults.yaml") == 1
+
+
+@pytest.mark.usefixtures("stack_mock")
+@pytest.mark.parametrize(
+    "matchers,path_prefix,files_dir,default_dir,use_subpath,include_query,expected",
+    (
+        (
+            None,
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/id/testminion/foo",
+                "tplroot/files/id/testminion/foo.jinja",
+                "tplroot/files/os_family/RedHat/foo",
+                "tplroot/files/os_family/RedHat/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["os_family", ""],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/os_family/RedHat/foo",
+                "tplroot/files/os_family/RedHat/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["os_family"],
+            None,
+            None,
+            None,
+            False,
+            False,
+            [
+                "tplroot/files/RedHat/foo",
+                "tplroot/files/RedHat/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["os_family"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/os_family/RedHat/foo",
+                "tplroot/files/os_family/RedHat/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["selinux:enabled"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/selinux:enabled/True/foo",
+                "tplroot/files/selinux:enabled/True/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["C@selinux:enabled"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/selinux:enabled/True/foo",
+                "tplroot/files/selinux:enabled/True/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["C::!@selinux!enabled"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/selinux!enabled/True/foo",
+                "tplroot/files/selinux!enabled/True/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["I@roles_pillar"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/roles_pillar/pillar_role_a/foo",
+                "tplroot/files/roles_pillar/pillar_role_b/foo",
+                "tplroot/files/roles_pillar/pillar_role_a/foo.jinja",
+                "tplroot/files/roles_pillar/pillar_role_b/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["I@roles_pillar"],
+            None,
+            None,
+            None,
+            False,
+            False,
+            [
+                "tplroot/files/pillar_role_a/foo",
+                "tplroot/files/pillar_role_b/foo",
+                "tplroot/files/pillar_role_a/foo.jinja",
+                "tplroot/files/pillar_role_b/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["I@roles_grains"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/roles_grains/foo",
+                "tplroot/files/roles_grains/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            True,
+            True,
+            [
+                "tplroot/foo/bar/files/id/testminion/foo",
+                "tplroot/foo/bar/files/id/testminion/foo.jinja",
+                "tplroot/foo/bar/files/os_family/RedHat/foo",
+                "tplroot/foo/bar/files/os_family/RedHat/foo.jinja",
+                "tplroot/foo/bar/files/default/foo",
+                "tplroot/foo/bar/files/default/foo.jinja",
+                "tplroot/foo/files/id/testminion/foo",
+                "tplroot/foo/files/id/testminion/foo.jinja",
+                "tplroot/foo/files/os_family/RedHat/foo",
+                "tplroot/foo/files/os_family/RedHat/foo.jinja",
+                "tplroot/foo/files/default/foo",
+                "tplroot/foo/files/default/foo.jinja",
+                "tplroot/files/id/testminion/foo",
+                "tplroot/files/id/testminion/foo.jinja",
+                "tplroot/files/os_family/RedHat/foo",
+                "tplroot/files/os_family/RedHat/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            None,
+            "altprefix",
+            None,
+            None,
+            False,
+            True,
+            [
+                "altprefix/files/id/testminion/foo",
+                "altprefix/files/id/testminion/foo.jinja",
+                "altprefix/files/os_family/RedHat/foo",
+                "altprefix/files/os_family/RedHat/foo.jinja",
+                "altprefix/files/default/foo",
+                "altprefix/files/default/foo.jinja",
+            ],
+        ),
+        (
+            None,
+            None,
+            "alt_files",
+            None,
+            False,
+            True,
+            [
+                "tplroot/alt_files/id/testminion/foo",
+                "tplroot/alt_files/id/testminion/foo.jinja",
+                "tplroot/alt_files/os_family/RedHat/foo",
+                "tplroot/alt_files/os_family/RedHat/foo.jinja",
+                "tplroot/alt_files/default/foo",
+                "tplroot/alt_files/default/foo.jinja",
+            ],
+        ),
+        (
+            None,
+            None,
+            None,
+            "alt_default",
+            False,
+            True,
+            [
+                "tplroot/files/id/testminion/foo",
+                "tplroot/files/id/testminion/foo.jinja",
+                "tplroot/files/os_family/RedHat/foo",
+                "tplroot/files/os_family/RedHat/foo.jinja",
+                "tplroot/files/alt_default/foo",
+                "tplroot/files/alt_default/foo.jinja",
+            ],
+        ),
+        (
+            None,
+            "alt_prefix",
+            "alt_files",
+            "alt_default",
+            False,
+            True,
+            [
+                "alt_prefix/alt_files/id/testminion/foo",
+                "alt_prefix/alt_files/id/testminion/foo.jinja",
+                "alt_prefix/alt_files/os_family/RedHat/foo",
+                "alt_prefix/alt_files/os_family/RedHat/foo.jinja",
+                "alt_prefix/alt_files/alt_default/foo",
+                "alt_prefix/alt_files/alt_default/foo.jinja",
+            ],
+        ),
+        (
+            None,
+            "global_files",
+            "",
+            None,
+            False,
+            True,
+            [
+                "global_files/id/testminion/foo",
+                "global_files/id/testminion/foo.jinja",
+                "global_files/os_family/RedHat/foo",
+                "global_files/os_family/RedHat/foo.jinja",
+                "global_files/default/foo",
+                "global_files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["a/static/path"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/a/static/path/foo",
+                "tplroot/files/a/static/path/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+        (
+            ["/an/absolute/static/path/"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/an/absolute/static/path/foo",
+                "tplroot/files/an/absolute/static/path/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
+    ),
+)
+def test_tofs(matchers, path_prefix, files_dir, default_dir, use_subpath, include_query, expected):
+    res = map_mod.tofs(
+        "tplroot/foo/bar",
+        ["foo", "foo.jinja"],
+        default_matchers=matchers,
+        include_query=include_query,
+        use_subpath=use_subpath,
+        path_prefix=path_prefix,
+        files_dir=files_dir if files_dir is not None else "files",
+        default_dir=default_dir if default_dir is not None else "default",
+    )
+    expected = [f"salt://{path}" for path in expected]
+    assert res == expected
+
+
+@pytest.mark.usefixtures("stack_mock")
+def test_tofs_absolute_sources():
+    res = map_mod.tofs(
+        "tplroot/foo/bar",
+        ["/etc/foo"],
+    )
+    assert res == [
+        "salt://tplroot/files/id/testminion/etc/foo",
+        "salt://tplroot/files/os_family/RedHat/etc/foo",
+        "salt://tplroot/files/default/etc/foo",
+    ]
+
+
+@pytest.mark.parametrize(
+    "overrides,expected",
+    (
+        (
+            {
+                "path_prefix": "alt_root",
+                "files_switch": ["os"],
+                "include_query": False,
+                "dirs": {
+                    "default": "alt_default",
+                    "files": "alt_files",
+                },
+            },
+            [
+                "alt_root/alt_files/Fedora/foo",
+                "alt_root/alt_files/Fedora/foo.jinja",
+                "alt_root/alt_files/alt_default/foo",
+                "alt_root/alt_files/alt_default/foo.jinja",
+            ],
+        ),
+        (
+            {
+                "path_prefix": "alt_root",
+                "files_switch": ["os"],
+                "include_query": False,
+                "dirs": {
+                    "default": "alt_default",
+                },
+            },
+            [
+                "alt_root/base_files/Fedora/foo",
+                "alt_root/base_files/Fedora/foo.jinja",
+                "alt_root/base_files/alt_default/foo",
+                "alt_root/base_files/alt_default/foo.jinja",
+            ],
+        ),
+        (
+            {
+                "path_prefix": "alt_root",
+                "files_switch": ["os"],
+                "include_query": False,
+                "dirs": {
+                    "files": "alt_files",
+                },
+            },
+            [
+                "alt_root/alt_files/Fedora/foo",
+                "alt_root/alt_files/Fedora/foo.jinja",
+                "alt_root/alt_files/base_default/foo",
+                "alt_root/alt_files/base_default/foo.jinja",
+            ],
+        ),
+        (
+            {"files_switch": ["os_family"], "source_files": {"foo-managed": ["alt_foo"]}},
+            [
+                "base_root/base_files/os_family/RedHat/alt_foo",
+                "base_root/base_files/os_family/RedHat/foo",
+                "base_root/base_files/os_family/RedHat/foo.jinja",
+                "base_root/base_files/base_default/alt_foo",
+                "base_root/base_files/base_default/foo",
+                "base_root/base_files/base_default/foo.jinja",
+            ],
+        ),
+    ),
+)
+def test_tofs_override(overrides, expected):
+    res = map_mod.tofs(
+        "tplroot/foo/bar",
+        ["foo", "foo.jinja"],
+        default_matchers=("id", "os_family"),
+        include_query=True,
+        use_subpath=False,
+        config={"tofs": overrides, "map_jinja": {"config_get_strategy": None}},
+        lookup="foo-managed",
+        path_prefix="base_root",
+        files_dir="base_files",
+        default_dir="base_default",
+    )
+    expected = [f"salt://{path}" for path in expected]
+    assert res == expected
+
+
+def test_subpath_matcher_override():
+    config = {
+        "tofs": {
+            "files_switch": ["id"],
+            "source_files": {
+                "foo-managed": ["alt_foo"],
+            },
+        },
+        "files_switch": ["os_family"],
+        "foo": {
+            "files_switch": ["osarch"],
+            "bar": {
+                "files_switch": ["os"],
+            },
+        },
+        "map_jinja": {
+            "config_get_strategy": None,
+        },
+    }
+    res = map_mod.tofs(
+        "tplroot/foo/bar/baz",
+        ["foo", "foo.jinja"],
+        use_subpath=True,
+        config=config,
+        path_prefix="alt_root",
+        files_dir="base_files",
+        default_dir="base_default",
+    )
+    assert res == [
+        "salt://alt_root/foo/bar/baz/base_files/id/testminion/foo",
+        "salt://alt_root/foo/bar/baz/base_files/id/testminion/foo.jinja",
+        "salt://alt_root/foo/bar/baz/base_files/base_default/foo",
+        "salt://alt_root/foo/bar/baz/base_files/base_default/foo.jinja",
+        "salt://alt_root/foo/bar/base_files/os/Fedora/foo",
+        "salt://alt_root/foo/bar/base_files/os/Fedora/foo.jinja",
+        "salt://alt_root/foo/bar/base_files/base_default/foo",
+        "salt://alt_root/foo/bar/base_files/base_default/foo.jinja",
+        "salt://alt_root/foo/base_files/osarch/x86_64/foo",
+        "salt://alt_root/foo/base_files/osarch/x86_64/foo.jinja",
+        "salt://alt_root/foo/base_files/base_default/foo",
+        "salt://alt_root/foo/base_files/base_default/foo.jinja",
+        "salt://alt_root/base_files/os_family/RedHat/foo",
+        "salt://alt_root/base_files/os_family/RedHat/foo.jinja",
+        "salt://alt_root/base_files/base_default/foo",
+        "salt://alt_root/base_files/base_default/foo.jinja",
+    ]

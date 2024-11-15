@@ -15,6 +15,7 @@ from saltext.formula.modules.map import _render_matcher
 from saltext.formula.modules.map import _render_matchers
 from saltext.formula.modules.map import data
 from saltext.formula.modules.map import stack
+from saltext.formula.modules.map import tofs
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ def __virtual__():
 
 data = namespaced_function(data, globals())
 stack = namespaced_function(stack, globals())
+tofs = namespaced_function(tofs, globals())
 _render_matcher = namespaced_function(_render_matcher, globals())
 _render_matchers = namespaced_function(_render_matchers, globals())
 

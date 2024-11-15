@@ -11,8 +11,22 @@ Heavily based on the excellent work done in the `template-formula <https://githu
   :hidden:
 
   topics/installation
+
+.. toctree::
+  :maxdepth: 2
+  :caption: Mapstack
+  :hidden:
+
   topics/mapstack
   topics/mapstack_details
+
+.. toctree::
+  :maxdepth: 2
+  :caption: TOFS
+  :hidden:
+
+  topics/tofs
+  topics/tofs_details
 
 .. toctree::
   :maxdepth: 2
