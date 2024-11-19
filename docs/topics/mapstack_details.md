@@ -25,6 +25,7 @@ Additionally, the following variables are provided:
 
 * `tplroot`: The formula root directory relative to the Salt fileserver root.
 * `mapdata`: Merged configuration from the previous layers.
+* `custom_data`: A custom mapping passed by the caller and used by the `U@` matcher.
 
 (post-map-jinja-target)=
 ## `post-map.jinja`
@@ -74,12 +75,12 @@ values:
   post_map: post-map.jinja
   post_map_template: jinja
   sources:
-    - Y:G@osarch
-    - Y:G@os_family
-    - Y:G@os
-    - Y:G@osfinger
+    - Y!G@osarch
+    - Y!G@os_family
+    - Y!G@os
+    - Y!G@osfinger
     - C@{{ tplroot }}
-    - Y:G@id
+    - Y!G@id
 ```
 
 (matcher-def-target)=
@@ -88,16 +89,26 @@ values:
 Configuration source layers are specified usig a list of matcher definitions
 that decide where to pull the configuration from.
 
-### Spec
+.. versionadded:: 0.3.0
+    These matcher definitions can each represent a chain, as shown in [Data source chains](data-source-chains-target).
 
-The definitions are structured like the following: `[<type>[:<option>[:<delimiter>]]@]<query>`
+### Spec (chain)
+A chain consists of one or more single matcher definitions: `[Y!]<single_def_0>[|<single_def_1>[|...]]`
+
+`Y!` prefix
+:   Indicates that the returns of the following matchers should be used
+    to render paths to parameter files. They are rendered using Jinja and loaded as YAML.
+
+`single_def`
+:   A [single matcher definition](spec-single-target). Multiple ones are separated by a `|`.
+
+(spec-single-target)=
+### Spec (single)
+
+Matcher definitions are structured like the following: `[<type>[:<option>[:<delimiter>]]@]<query>`
 
 type
-:   The layer's configuration data source. Defaults to `Y`.
-
-    `Y`
-    :   Query minion metadata and use the result to build a path to a file which provides
-        the layer configuration. It is rendered using Jinja and loaded as YAML.
+:   The layer's configuration data source.
 
     `C`
     :   Query {py:func}`config.get <salt.modules.config.get>` and use its
@@ -111,29 +122,36 @@ type
     :   Query {py:func}`pillar.get <salt.modules.pillar.get>` and use its
         return as this layer's configuration.
 
+    `P`
+    :   Specify that this query is a static one (represents a static path).
+
+    `M`
+    :   Traverse the currently rendered configuration. Mostly useful in chains.
+
+    `U`
+    :   Traverse the dictionary passed by the caller as `custom_dict`. Useful in chains or when
+        enforcing specific overrides.
+
 option
 :   An option, valid values depend on the `type`.
 
-    For `Y`, this defines which data source is queried for the metadata.
-    Can be `C`, `G` or `I`. Defaults to `C`.
-
-    For `C`/`G`/`I`, this can be set to `SUB`, which nests the result
-    inside the key defined by `query` instead of merging it into the stack root.
+    This can be set to `SUB`, which nests the result inside the key defined by `query`
+    instead of merging it into the stack root.
 
 delimiter
 :   Define a different delimiter for the query. This can be important on Windows
-    for `Y` `type` since the path contains the `query` value and the default
-    delimiter (`:`) is disallowed in paths on Windows. Defaults to `:`.
+    when loading YAML files since the path contains the `query` value and the default
+    delimiter is disallowed in paths on Windows. Defaults to `:`.
 
 query
-:   The value to look up with `type` (`option` for `Y`).
+:   The value to look up with `type`.
 
 ### Examples
 
 `I@mysql`
 :   Run `salt["pillar.get"]("mysql")` and merge the resulting dictionary into the stack.
 
-`Y@roles`
+`Y!roles`
 :   Run `salt["config.get"]("roles")`, build a list of paths, render and load
     the files and merge the resulting dictionary into the stack.
 
@@ -151,19 +169,25 @@ query
     Notice how lists are expanded into separate paths. The same works for dictionary keys.
     :::
 
-`Y:I@roles`
-:   Does the same as `Y@roles`, but restricts the value source to the pillar.
+`Y!I@roles`
+:   Does the same as `Y!roles`, but restricts the value source to the pillar.
 
-`defaults.yaml`
+`Y!P@defaults.yaml`
 :   Don't query metadata, always load this static path as a YAML data source.
 
-`Y:G:!@selinux!enabled`
+`Y!G::!@selinux!enabled`
 :   Run `salt["`{py:func}`config.get <salt.modules.config.get>``"]("selinux!enabled", delimiter="!")`, build a list of paths, render and load
     the files and merge the resulting dictionary into the stack.
     If SELinux is enabled on the minion, the tried paths are:
 
     - `selinux!enabled/True.yaml`
     - `selinux!enabled/True.yaml.jinja`
+
+`Y!G@os_family|I@roles`
+:   See [YAML chaining](data-source-chains-yaml-target).
+
+`C@tplroot:variant_defaults|M@variant`
+:   See [raw chaining](data-source-chains-raw-target).
 
 ## Differences to `template-formula` with `libmapstack.jinja`
 ### Breaking
@@ -173,7 +197,11 @@ query
 * Cached configuration, reducing rendering times significantly
 * All meta configuration parameters are read from `map_jinja.yaml`
 * The name of `post-map.jinja` and its template language are configurable
+* Added `U` (custom data)/`P` (static path)/`M` (mapdata) matchers
+* Allowed to chain multiple matchers to load parameter paths that vary in two or more variables
+* Allowed to chain multiple matchers to filter raw (non-YAML) matcher returns
 
 ### Changed
 * An obvious file data source like `defaults.yaml` was first tried via `salt["config.get"]`. This has been removed.
 * If a data source query did not yield any results, it was tried as a YAML file path instead. This has been removed.
+* The `Y:` type matcher has been deprecated. The `Y!` prefix should be used instead.

@@ -11,8 +11,9 @@ import logging
 
 from salt.utils.functools import namespaced_function
 
+from saltext.formula.modules.map import _concat_parts as _concat_parts_base
 from saltext.formula.modules.map import _render_matcher as _render_matcher_base
-from saltext.formula.modules.map import _render_matchers as _render_matchers_base
+from saltext.formula.modules.map import _render_matcher_chain as _render_matcher_chain_base
 from saltext.formula.modules.map import data
 from saltext.formula.modules.map import stack
 from saltext.formula.modules.map import tofs
@@ -29,13 +30,15 @@ def __virtual__():
 data = namespaced_function(data, globals())
 stack = namespaced_function(stack, globals())
 tofs = namespaced_function(tofs, globals())
+_concat_parts = namespaced_function(_concat_parts_base, globals())
 _render_matcher = namespaced_function(_render_matcher_base, globals())
-_render_matchers = namespaced_function(_render_matchers_base, globals())
+_render_matcher_chain = namespaced_function(_render_matcher_chain_base, globals())
 
 
 for func, base in (
+    (_concat_parts, _concat_parts_base),
     (_render_matcher, _render_matcher_base),
-    (_render_matchers, _render_matchers_base),
+    (_render_matcher_chain, _render_matcher_chain_base),
 ):
     # namespaced_function does not initialize keyword-only argument defaults,
     # making them required arguments.

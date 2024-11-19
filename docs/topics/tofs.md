@@ -39,7 +39,7 @@ Manage nginx.conf:
 ## Differences to `libtofs.jinja`
 * By default, includes the query in file paths (`files/os_family/Debian` instead of `files/Debian`). This can be disabled via the `include_query` parameter.
 * Reads `tofs` configuration from all Mapstack sources (including YAML). Previously, this configuration could only be set in pillars/grains/opts.
-* Accepts matcher definitions for file paths in the [same style as Mapstack](matcher-def-target) (excluding `Y@`).
+* Accepts matcher definitions, including chains, for file paths in the [same style as Mapstack](matcher-def-target) (`Y!` prefix is disallowed).
 
 ## Reference
 This overview is currently very basic. For details, see the [original description][tofs-pattern].

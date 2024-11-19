@@ -76,6 +76,63 @@ def pillar(loaders):
             "config_data_source": "pillar",
             "pillar": True,
         },
+        "tplroot_role_defaults": {
+            "db": {
+                "data_source": "tplroot_role_defaults",
+                "config_data_source": "tplroot_role_defaults",
+                "tplroot_role_defaults": True,
+            }
+        },
+        "tplroot_mergebase": {
+            "list": ["foo"],
+            "map": {
+                "foo": True,
+            },
+        },
+        "tplroot_merge_role_defaults": {
+            "db": {
+                "list": ["bar"],
+                "map": {
+                    "bar": True,
+                },
+            },
+            "db_master": {
+                "list": ["baz"],
+                "map": {
+                    "baz": True,
+                },
+            },
+        },
+        "tplroot_merge_role_defaults_lists": {
+            "merge_lists": True,
+            "db": {
+                "list": ["bar"],
+                "map": {
+                    "bar": True,
+                },
+            },
+            "db_master": {
+                "list": ["baz"],
+                "map": {
+                    "baz": True,
+                },
+            },
+        },
+        "tplroot_merge_role_defaults_overwrite": {
+            "strategy": "overwrite",
+            "db": {
+                "list": ["bar"],
+                "map": {
+                    "bar": True,
+                },
+            },
+            "db_master": {
+                "list": ["baz"],
+                "map": {
+                    "baz": True,
+                },
+            },
+        },
     }
     # We're patching the loaded pillar itself since reloading
     # it in functional tests does not work reliably (and takes more time
@@ -120,6 +177,22 @@ def defaults_yaml_jinja(param_dir):
 
 
 @pytest.fixture
+def invalid_defaults_yaml(param_dir):
+    contents = {
+        "booh": True,
+        "strategy": "smart",
+        "merge_lists": True,
+        "values": {
+            "data_source": "defaults_yaml_jinja",
+            "yaml_data_source": "defaults_yaml_jinja",
+            "defaults_yaml_jinja": True,
+        },
+    }
+    with pytest.helpers.temp_file("invalid_defaults.yaml", json.dumps(contents), param_dir):
+        yield
+
+
+@pytest.fixture
 def global_defaults_yaml(state_tree, request):
     if getattr(request, "param", None) is False:
         ctx = contextlib.nullcontext()
@@ -154,6 +227,57 @@ def grains_os(param_dir, modules, request):
     }
     with pytest.helpers.temp_file(f"{os}.yaml", json.dumps(contents), param_dir / "os"):
         yield request.param
+
+
+@pytest.fixture
+def grains_os_pillar_roles(param_dir, modules):
+    os = modules.grains.get("os")
+    contents = {
+        "values": {
+            "data_source": "grains_os_pillar_roles",
+            "yaml_data_source": "grains_os_pillar_roles",
+            "grains_os_pillar_roles": True,
+        }
+    }
+    with pytest.helpers.temp_file("db.yaml", json.dumps(contents), param_dir / "os" / os / "roles"):
+        yield
+
+
+@pytest.fixture
+def custom_users(param_dir):
+    contents = {
+        "values": {
+            "data_source": "custom_users_testuser",
+            "yaml_data_source": "custom_users_testuser",
+            "custom_users_testuser": True,
+        }
+    }
+    with pytest.helpers.temp_file("testuser.yaml", json.dumps(contents), param_dir / "users"):
+        yield
+
+
+@pytest.fixture
+def variant(param_dir):
+    variant_name = "testvariant"
+    selection_contents = {
+        "values": {
+            "variant": variant_name,
+        }
+    }
+    variant_contents = {
+        "values": {
+            "data_source": variant_name,
+            "yaml_data_source": variant_name,
+            variant_name: True,
+        }
+    }
+    with pytest.helpers.temp_file(
+        "variant_selection.yaml", json.dumps(selection_contents), param_dir
+    ):
+        with pytest.helpers.temp_file(
+            f"{variant_name}.yaml", json.dumps(variant_contents), param_dir / "variant"
+        ):
+            yield
 
 
 @pytest.fixture(params=(True,))
@@ -391,6 +515,7 @@ def map_mod(modules):
         (["C@nonexistent"], {}),
         (["I@nonexistent"], {}),
         (["G@nonexistent"], {}),
+        (["Y:G@nonexistent"], {}),
         (
             ["C@nonexistent", "C@tplroot"],
             {"config_data_source": "opts", "data_source": "opts", "opts": True},
@@ -403,11 +528,66 @@ def map_mod(modules):
             ["G@nonexistent", "G@tplroot"],
             {"config_data_source": "grains", "data_source": "grains", "grains": True},
         ),
+        (
+            ["I@tplroot_role_defaults|I@roles"],
+            {
+                "config_data_source": "tplroot_role_defaults",
+                "data_source": "tplroot_role_defaults",
+                "tplroot_role_defaults": True,
+            },
+        ),
+        (
+            ["I@tplroot_mergebase", "I@tplroot_merge_role_defaults|I@roles"],
+            {"list": ["baz"], "map": {"foo": True, "bar": True, "baz": True}},
+        ),
+        (
+            ["I@tplroot_mergebase", "I@tplroot_merge_role_defaults_lists|I@roles"],
+            {"list": ["foo", "bar", "baz"], "map": {"foo": True, "bar": True, "baz": True}},
+        ),
+        (
+            ["I@tplroot_mergebase", "I@tplroot_merge_role_defaults_overwrite|I@roles"],
+            {"list": ["baz"], "map": {"baz": True}},
+        ),
+        (
+            ["I@tplroot_mergebase", "I@tplroot_merge_role_defaults_overwrite|I@nonexistent"],
+            {"list": ["foo"], "map": {"foo": True}},
+        ),
+        (
+            ["I@tplroot_mergebase", "U@overrides"],
+            {"list": ["bar"], "map": {"foo": True, "bar": True}},
+        ),
+        (["I@tplroot_mergebase", "U@overrides_overwrite"], {"list": ["bar"], "map": {"bar": True}}),
+        (
+            ["I@tplroot_mergebase", "U@overrides_merge_lists"],
+            {"list": ["foo", "bar"], "map": {"foo": True, "bar": True}},
+        ),
     ),
 )
 def test_stack_query(matchers, expected, map_mod):
-    res = map_mod.stack("tplroot/foo/bar", matchers)
-    assert res == {"values": expected}
+    custom_data = {
+        "overrides": {
+            "map": {
+                "bar": True,
+            },
+            "list": ["bar"],
+        },
+        "overrides_overwrite": {
+            "strategy": "overwrite",
+            "map": {
+                "bar": True,
+            },
+            "list": ["bar"],
+        },
+        "overrides_merge_lists": {
+            "merge_lists": True,
+            "map": {
+                "bar": True,
+            },
+            "list": ["bar"],
+        },
+    }
+    res = map_mod.stack("tplroot/foo/bar", matchers, custom_data=custom_data)
+    assert res == expected
 
 
 @pytest.mark.usefixtures(
@@ -416,8 +596,11 @@ def test_stack_query(matchers, expected, map_mod):
     "pillar_roles",
     "pillar_roles_nested",
     "grains_os",
+    "grains_os_pillar_roles",
     "non_string_yaml",
     "opts_roles",
+    "custom_users",
+    "variant",
 )
 @pytest.mark.parametrize(
     "matchers,expected",
@@ -507,18 +690,48 @@ def test_stack_query(matchers, expected, map_mod):
             ["Y:C@integer_list"],
             {"data_source": "integer_list", "yaml_data_source": "integer_list", "integer_list": 2},
         ),
+        (
+            ["Y!G@os|I@roles"],
+            {
+                "data_source": "grains_os_pillar_roles",
+                "yaml_data_source": "grains_os_pillar_roles",
+                "grains_os_pillar_roles": True,
+            },
+        ),
+        (
+            ["Y:U@users"],
+            {
+                "data_source": "custom_users_testuser",
+                "yaml_data_source": "custom_users_testuser",
+                "custom_users_testuser": True,
+            },
+        ),
+        (
+            ["variant_selection.yaml", "Y:M@variant"],
+            {
+                "variant": "testvariant",
+                "data_source": "testvariant",
+                "yaml_data_source": "testvariant",
+                "testvariant": True,
+            },
+        ),
     ),
 )
 def test_stack_yaml_and_query(matchers, expected, map_mod):
-    res = map_mod.stack("tplroot/foo/bar", matchers)
-    assert res == {"values": expected}
+    custom_data = {"users": ["testuser", "testadmin"]}
+    res = map_mod.stack("tplroot/foo/bar", matchers, custom_data=custom_data)
+    assert res == expected
+
+
+@pytest.mark.usefixtures("invalid_defaults_yaml")
+def test_stack_yaml_invalid_return(map_mod):
+    with pytest.raises(TypeError, match=".*invalid_defaults\\.yaml.*"):
+        map_mod.stack("tplroot/foo/bar", ["invalid_defaults.yaml"])
 
 
 @pytest.mark.parametrize("config_get_strategy", (None, "merge"))
 def test_stack_yaml_config_get_strategy(config_get_strategy, map_mod):
-    res = map_mod.stack("tplroot/foo/bar", ["C@tplroot"], config_get_strategy=config_get_strategy)[
-        "values"
-    ]
+    res = map_mod.stack("tplroot/foo/bar", ["C@tplroot"], config_get_strategy=config_get_strategy)
     assert res["config_data_source"] == "opts"
 
     config_sources = (
@@ -629,25 +842,30 @@ def test_stack_yaml_config_get_strategy(config_get_strategy, map_mod):
 )
 def test_stack_yaml_multiple_parameter_dirs(map_mod, dirs, matchers, expected):
     res = map_mod.stack("tplroot/foo/bar", matchers, parameter_dirs=dirs)
-    assert res["values"] == expected
+    assert res == expected
 
 
 def test_stack_yaml_jinja_context(map_mod, param_dir):
     tpldir = "tplroot/foo/bar"
     contents_defaults = {"tpldir": "{{ tpldir }}", "tplroot": "{{ tplroot }}", "setting": "foo"}
-    contents_roles = {"mapdata_available": "{{ mapdata.get('setting') == 'foo'}}"}
+    contents_roles = {
+        "mapdata_available": "{{ mapdata.get('setting') == 'foo'}}",
+        "custom_data_available": "{{ custom_data.get('foo') == 'foo'}}",
+    }
     with pytest.helpers.temp_file(
         "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
     ):
         with pytest.helpers.temp_file(
             "db.yaml.jinja", json.dumps({"values": contents_roles}), param_dir / "roles"
         ):
-            res = map_mod.stack(tpldir, ["defaults.yaml", "Y:I@roles"])
-    assert res["values"] == {
+            custom_data = {"foo": "foo"}
+            res = map_mod.stack(tpldir, ["defaults.yaml", "Y:I@roles"], custom_data=custom_data)
+    assert res == {
         "tpldir": tpldir,
         "tplroot": tpldir.split("/", maxsplit=1)[0],
         "setting": "foo",
         "mapdata_available": "True",
+        "custom_data_available": "True",
     }
 
 
@@ -679,9 +897,9 @@ def test_stack_yaml_meta_strategy(map_mod, param_dir, merge_strategy, default_me
                 default_merge_strategy=default_merge_strategy,
             )
     if merge_strategy == "overwrite":
-        assert res["values"] == {"nested": {"value": False}}
+        assert res == {"nested": {"value": False}}
     else:
-        assert res["values"] == {"nested": {"value": False, "default": True}}
+        assert res == {"nested": {"value": False, "default": True}}
 
 
 @pytest.mark.parametrize("merge_lists", (False, True))
@@ -707,9 +925,9 @@ def test_stack_yaml_meta_merge_lists(map_mod, param_dir, merge_lists, default_me
                 default_merge_lists=default_merge_lists,
             )
     if merge_lists:
-        assert res["values"] == {"list": ["foo", "bar", "baz"]}
+        assert res == {"list": ["foo", "bar", "baz"]}
     else:
-        assert res["values"] == {"list": ["baz"]}
+        assert res == {"list": ["baz"]}
 
 
 @pytest.mark.usefixtures("defaults_yaml", "pillar_roles")
@@ -752,13 +970,13 @@ def test_data_defaults(grains_os, grains_id, config_get_strategy, map_mod):
         "post_map": "post-map.jinja",
         "post_map_template": "jinja",
         "sources": [
-            "defaults.yaml",
-            "Y:G@osarch",
-            "Y:G@os_family",
-            "Y:G@os",
-            "Y:G@osfinger",
+            "Y!P@defaults.yaml",
+            "Y!G@osarch",
+            "Y!G@os_family",
+            "Y!G@os",
+            "Y!G@osfinger",
             "C@tplroot",
-            "Y:G@id",
+            "Y!G@id",
         ],
     }
 
@@ -830,5 +1048,26 @@ def test_data_cache(map_mod, cache):
     assert res8 is not res
     assert res8 is not res6
     assert res8 is not res7
-    res9 = map_mod.data("tplroot/foo/bar", cache=cache)
-    assert (res9 is res) is cache
+    custom_data = {"foo": "foo"}
+    res9 = map_mod.data(
+        "tplroot/foo/bar",
+        cache=cache,
+        custom_data=custom_data,
+    )
+    assert res9 is not res
+    res10 = map_mod.data(
+        "tplroot/foo/bar",
+        cache=cache,
+        custom_data={"foo": "bar"},
+    )
+    assert res10 is not res9
+    assert res10 is not res
+    res11 = map_mod.data(
+        "tplroot/foo/bar",
+        cache=cache,
+        custom_data=custom_data,
+    )
+    assert res11 is not res10
+    assert (res11 is res9) is cache
+    res12 = map_mod.data("tplroot/foo/bar", cache=cache)
+    assert (res12 is res) is cache

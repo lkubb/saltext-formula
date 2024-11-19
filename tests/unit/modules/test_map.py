@@ -75,130 +75,280 @@ def configure_loader_modules(opts, grains, pillar, context, cp_get_template):
 
 
 @pytest.mark.parametrize(
-    "matcher,expected",
+    "matcher,cls,exp_yaml,attrs,value",
     (
         (
             "roles_opts",
+            map_mod.ConfigMatcher,
+            True,
             {
-                "query_method": "config.get",
                 "query": "roles_opts",
-                "value": ["opts_role_a", "opts_role_b"],
+                "options": (),
+                "delimiter": ":",
             },
+            ["opts_role_a", "opts_role_b"],
         ),
         (
             "C@tplroot_opts",
-            {"query_method": "config.get", "query": "tplroot_opts", "value": {"config": "data"}},
+            map_mod.ConfigMatcher,
+            False,
+            {"query": "tplroot_opts", "options": (), "delimiter": ":"},
+            {"config": "data"},
         ),
         (
             "C@nested:opts:config",
-            {"query_method": "config.get", "query": "nested:opts:config", "value": {"data": True}},
+            map_mod.ConfigMatcher,
+            False,
+            {"query": "nested:opts:config", "options": (), "delimiter": ":"},
+            {"data": True},
         ),
         (
             "C:::@nested:opts:config",
-            {"query_method": "config.get", "query": "nested:opts:config", "value": {"data": True}},
+            map_mod.ConfigMatcher,
+            False,
+            {"query": "nested:opts:config", "options": (), "delimiter": ":"},
+            {"data": True},
         ),
         (
             "C:SUB@nested:opts:config",
-            {
-                "query_method": "config.get",
-                "query": "nested:opts:config",
-                "value": {"data": True},
-                "option": "SUB",
-            },
+            map_mod.ConfigMatcher,
+            False,
+            {"query": "nested:opts:config", "options": ("SUB",), "delimiter": ":"},
+            {"nested:opts:config": {"data": True}},
         ),
         (
             "C:SUB:!@nested!opts!config",
-            {
-                "query_method": "config.get",
-                "query": "nested!opts!config",
-                "value": {"data": True},
-                "option": "SUB",
-            },
+            map_mod.ConfigMatcher,
+            False,
+            {"query": "nested!opts!config", "options": ("SUB",), "delimiter": "!"},
+            {"nested!opts!config": {"data": True}},
         ),
         (
             "C:SUB::@nested:opts:config",
-            {
-                "query_method": "config.get",
-                "query": "nested:opts:config",
-                "value": {"data": True},
-                "option": "SUB",
-            },
+            map_mod.ConfigMatcher,
+            False,
+            {"query": "nested:opts:config", "options": ("SUB",), "delimiter": ":"},
+            {"nested:opts:config": {"data": True}},
         ),
         (
             "G@tplroot_grains",
-            {"query_method": "grains.get", "query": "tplroot_grains", "value": {"config": "data"}},
+            map_mod.GrainsMatcher,
+            False,
+            {"query": "tplroot_grains", "options": (), "delimiter": ":"},
+            {"config": "data"},
         ),
         (
             "I@tplroot_pillar",
-            {"query_method": "pillar.get", "query": "tplroot_pillar", "value": {"config": "data"}},
+            map_mod.PillarMatcher,
+            False,
+            {"query": "tplroot_pillar", "options": (), "delimiter": ":"},
+            {"config": "data"},
         ),
-        ("defaults.yaml", {"query_method": None, "query": "defaults.yaml", "value": ...}),
+        (
+            "defaults.yaml",
+            map_mod.StaticMatcher,
+            True,
+            {"query": "defaults.yaml", "options": (), "delimiter": ":"},
+            ["defaults.yaml"],
+        ),
         (
             "Y@roles_opts",
+            map_mod.ConfigMatcher,
+            True,
             {
-                "query_method": "config.get",
                 "query": "roles_opts",
-                "value": ["opts_role_a", "opts_role_b"],
+                "options": (),
+                "delimiter": ":",
             },
+            ["opts_role_a", "opts_role_b"],
         ),
         (
             "Y:C@roles_opts",
+            map_mod.ConfigMatcher,
+            True,
             {
-                "query_method": "config.get",
                 "query": "roles_opts",
-                "value": ["opts_role_a", "opts_role_b"],
+                "options": (),
+                "delimiter": ":",
             },
+            ["opts_role_a", "opts_role_b"],
         ),
         (
             "Y:I@roles_pillar",
+            map_mod.PillarMatcher,
+            True,
             {
-                "query_method": "pillar.get",
                 "query": "roles_pillar",
-                "value": ["pillar_role_a", "pillar_role_b"],
+                "options": (),
+                "delimiter": ":",
             },
+            ["pillar_role_a", "pillar_role_b"],
         ),
         (
             "Y:G@roles_grain",
+            map_mod.GrainsMatcher,
+            True,
             {
-                "query_method": "grains.get",
                 "query": "roles_grain",
-                "value": ["grain_role_a", "grain_role_b"],
+                "options": (),
+                "delimiter": ":",
             },
+            ["grain_role_a", "grain_role_b"],
         ),
-        ("Y:G@os", {"query_method": "grains.get", "query": "os", "value": ["Fedora"]}),
+        (
+            "Y:G@os",
+            map_mod.GrainsMatcher,
+            True,
+            {
+                "query": "os",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["Fedora"],
+        ),
         (
             "Y:G@selinux:enabled",
-            {"query_method": "grains.get", "query": "selinux:enabled", "value": ["True"]},
+            map_mod.GrainsMatcher,
+            True,
+            {
+                "query": "selinux:enabled",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["True"],
         ),
         (
             "Y:G::@selinux:enabled",
-            {"query_method": "grains.get", "query": "selinux:enabled", "value": ["True"]},
+            map_mod.GrainsMatcher,
+            True,
+            {
+                "query": "selinux:enabled",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["True"],
         ),
         (
             "Y:G:!@selinux!enabled",
-            {"query_method": "grains.get", "query": "selinux!enabled", "value": ["True"]},
+            map_mod.GrainsMatcher,
+            True,
+            {
+                "query": "selinux!enabled",
+                "options": (),
+                "delimiter": "!",
+            },
+            ["True"],
         ),
         (
             "C@nonexistent",
-            {"query_method": "config.get", "query": "nonexistent", "value": map_mod.UNSET},
+            map_mod.ConfigMatcher,
+            False,
+            {
+                "query": "nonexistent",
+                "options": (),
+                "delimiter": ":",
+            },
+            ...,
         ),
         (
             "I@nonexistent",
-            {"query_method": "pillar.get", "query": "nonexistent", "value": map_mod.UNSET},
+            map_mod.PillarMatcher,
+            False,
+            {
+                "query": "nonexistent",
+                "options": (),
+                "delimiter": ":",
+            },
+            ...,
         ),
         (
             "G@nonexistent",
-            {"query_method": "grains.get", "query": "nonexistent", "value": map_mod.UNSET},
+            map_mod.GrainsMatcher,
+            False,
+            {
+                "query": "nonexistent",
+                "options": (),
+                "delimiter": ":",
+            },
+            ...,
+        ),
+        (
+            "Y:G@nonexistent",
+            map_mod.GrainsMatcher,
+            True,
+            {
+                "query": "nonexistent",
+                "options": (),
+                "delimiter": ":",
+            },
+            ...,
+        ),
+        (
+            "P@defaults.yaml",
+            map_mod.StaticMatcher,
+            False,
+            {
+                "query": "defaults.yaml",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["defaults.yaml"],
+        ),
+        (
+            "Y:M@variant",
+            map_mod.MapdataMatcher,
+            True,
+            {
+                "query": "variant",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["foo"],
+        ),
+        (
+            "Y:U@users",
+            map_mod.CustomMatcher,
+            True,
+            {
+                "query": "users",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["testuser"],
+        ),
+        (
+            "Y:U@users_str",
+            map_mod.CustomMatcher,
+            True,
+            {
+                "query": "users_str",
+                "options": (),
+                "delimiter": ":",
+            },
+            ["testuser"],
         ),
     ),
 )
-def test_render_matcher(matcher, expected):
-    res = map_mod._render_matcher(matcher)
-    for param, val in expected.items():
-        if param == "value" and val is map_mod.UNSET:
-            assert res[param] is val
-        else:
-            assert res[param] == val
+def test_render_matcher(matcher, cls, exp_yaml, attrs, value):
+    render_context = map_mod.RenderContext(
+        stack={"variant": "foo"},
+        base_dirs=["tplroot/parameters"],
+        tpldir="tplroot/foo/bar",
+        tplroot="tplroot",
+        custom_data={"users": ["testuser"], "users_str": "testuser"},
+    )
+    res, is_yaml = map_mod._render_matcher(matcher)
+    assert res.__class__ is cls
+    assert is_yaml is exp_yaml
+    for attr, val in attrs.items():
+        assert getattr(res, attr) == val
+    if exp_yaml:
+        assert res.value_list(render_context=render_context).values == value
+    else:
+        try:
+            assert res.value(render_context=render_context).values == value
+        except NotImplementedError:
+            assert res.value_list(render_context=render_context).values == value
 
 
 @pytest.mark.parametrize(
@@ -211,17 +361,79 @@ def test_render_matcher(matcher, expected):
     ),
 )
 def test_render_matcher_for_path_rendering(matcher, expected):
-    res = map_mod._render_matcher(matcher, for_path_rendering=True)
-    assert res["query_method"] == "config.get"
-    assert res["type"] == "C"
-    assert res["query"] == matcher.split("@")[-1]
-    assert res["value"] == expected
+    render_context = map_mod.RenderContext(
+        stack={},
+        base_dirs=["tplroot/parameters"],
+        tpldir="tplroot/foo/bar",
+        tplroot="tplroot",
+    )
+    res, is_yaml = map_mod._render_matcher(matcher, for_path_rendering=True)
+    assert is_yaml is False
+    assert res.__class__ is map_mod.ConfigMatcher
+    assert res.query == matcher.split("@")[-1]
+    assert res.value_list(render_context=render_context).values == expected
 
 
 @pytest.mark.parametrize("matcher", ("defaults.yaml", "Y:C@roles_opts"))
 def test_render_matcher_for_path_rendering_yaml_disallowed(matcher):
     with pytest.raises(ValueError, match=f".*not allowed in this context.*{matcher}$"):
         map_mod._render_matcher(matcher, for_path_rendering=True)
+
+
+@pytest.mark.parametrize(
+    "chain,typ,matchers",
+    (
+        (
+            "Y!G@os|C@roles_opts",
+            map_mod.YAMLRenderer,
+            [
+                map_mod.GrainsMatcher(query="os", __salt__={"grains.get": grains_mod.get}),
+                map_mod.ConfigMatcher(query="roles_opts", __salt__={"config.get": config_mod.get}),
+            ],
+        ),
+        (
+            "Y!roles",
+            map_mod.YAMLRenderer,
+            [map_mod.ConfigMatcher(query="roles", __salt__={"config.get": config_mod.get})],
+        ),
+    ),
+)
+def test_render_matcher_chain(chain, typ, matchers):
+    render_context = map_mod.RenderContext(
+        stack={"variant": "foo"},
+        base_dirs=["tplroot/parameters"],
+        tpldir="tplroot/foo/bar",
+        tplroot="tplroot",
+        custom_data={"users": ["testuser"], "users_str": "testuser"},
+    )
+    renderer = map_mod._render_matcher_chain(chain, render_context)
+    assert isinstance(renderer, typ)
+    assert len(renderer._matchers) == len(matchers)
+    for actual_matcher, expected_matcher in zip(renderer._matchers, matchers):
+        assert isinstance(actual_matcher, type(expected_matcher))
+        for slot in expected_matcher.__slots__:
+            if slot.startswith("_"):
+                continue
+            assert getattr(actual_matcher, slot) == getattr(expected_matcher, slot)
+
+
+@pytest.mark.parametrize(
+    "chain,for_path_rendering,msg",
+    (
+        ("variant_defaults.yaml|M@variant", False, "Cannot append other matchers after.*"),
+        ("os|variant_defaults.yaml|M@variant", False, "Cannot use YAML matcher in query chains.*"),
+        ("Y!G@os|C@roles_opts", True, "Cannot use YAML renderer for path rendering.*"),
+    ),
+)
+def test_render_matcher_chain_disallowed(chain, for_path_rendering, msg):
+    render_context = map_mod.RenderContext(
+        stack={},
+        base_dirs=["tplroot/parameters"],
+        tpldir="tplroot/foo/bar",
+        tplroot="tplroot",
+    )
+    with pytest.raises(ValueError, match=msg):
+        map_mod._render_matcher_chain(chain, render_context, for_path_rendering=for_path_rendering)
 
 
 def test_data_configuration_override(context, cp_get_template):
@@ -239,7 +451,7 @@ def test_data_configuration_override(context, cp_get_template):
         "cache": False,
     }
     with patch("saltext.formula.modules.map.stack", autospec=True) as stack:
-        stack.side_effect = ({"values": default_formula_config}, {"values": {}})
+        stack.side_effect = (default_formula_config, {})
         res = map_mod.data("tplroot/foo/bar", config_get_strategy="foobar")
 
     assert res == {"map_jinja": default_formula_config}
@@ -264,7 +476,7 @@ def test_data_configuration_override(context, cp_get_template):
 @pytest.fixture
 def stack_mock():
     def _stack(*args, default_values=None, **kwargs):  # pylint: disable=unused-argument
-        return {"values": default_values or {}}
+        return default_values or {}
 
     with patch("saltext.formula.modules.map.stack", autospec=True, side_effect=_stack) as stack:
         yield stack
@@ -568,6 +780,22 @@ def test_data_no_duplicate_defaults_yaml():
                 "tplroot/files/default/foo.jinja",
             ],
         ),
+        (
+            ["G@os_family|I@roles_pillar|P@foo/bar/baz"],
+            None,
+            None,
+            None,
+            False,
+            True,
+            [
+                "tplroot/files/os_family/RedHat/roles_pillar/pillar_role_a/foo/bar/baz/foo",
+                "tplroot/files/os_family/RedHat/roles_pillar/pillar_role_b/foo/bar/baz/foo",
+                "tplroot/files/os_family/RedHat/roles_pillar/pillar_role_a/foo/bar/baz/foo.jinja",
+                "tplroot/files/os_family/RedHat/roles_pillar/pillar_role_b/foo/bar/baz/foo.jinja",
+                "tplroot/files/default/foo",
+                "tplroot/files/default/foo.jinja",
+            ],
+        ),
     ),
 )
 def test_tofs(matchers, path_prefix, files_dir, default_dir, use_subpath, include_query, expected):
@@ -680,7 +908,7 @@ def test_tofs_override(overrides, expected):
     assert res == expected
 
 
-def test_subpath_matcher_override():
+def test_tofs_subpath_matcher_override():
     config = {
         "tofs": {
             "files_switch": ["id"],
