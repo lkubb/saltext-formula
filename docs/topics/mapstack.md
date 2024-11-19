@@ -26,7 +26,7 @@ This describes basics only. Many aspects of the layering process are highly conf
 
 ### Data sources
 
-Each [data source](matcher-def-target) provides a single configuration layer. Usually, data sources are YAML files in a formula's `parameters` directory that are associated with minions based on grain (`Y:G@os`) or pillar (`Y:I@roles`) variables.
+Each [data source](matcher-def-target) provides a single configuration layer. Usually, data sources are YAML files in a formula's `parameters` directory that are associated with minions based on grain (`Y!G@os`) or pillar (`Y!I@roles`) variables.
 
 :::{hint}
 As you might have noticed, this takes significant inspiration from Salt's pillar top files.
@@ -36,18 +36,45 @@ A data source can also be one of the inbuilt global configuration dictionaries d
 
 Based on their hierarchy, all data source returns are merged into a single configuration dictionary.
 
+(data-source-chains-target)=
+#### Data source chains
+:::{versionadded} 0.3.0
+:::
+
+It's also possible to chain data sources using the `|` separator, where the syntax and behavior depends on whether the result will be loaded as a YAML file or not.
+
+(data-source-chains-yaml-target)=
+##### YAML
+Chaining data sources for the YAML renderer looks like this: `Y!G@os_family|I@roles`. Matcher returns are interpreted as path segments to a YAML file. A `mysql` formula running on a minion with `grains.os_family == "RedHat"` and `pillar["roles"] == ["db", "db_master"]` will look for the following YAML files to load:
+
+- `salt://mysql/parameters/os_family/RedHat/roles/db.yaml`
+- `salt://mysql/parameters/os_family/RedHat/roles/db.yaml.jinja`
+- `salt://mysql/parameters/os_family/RedHat/roles/db_master.yaml`
+- `salt://mysql/parameters/os_family/RedHat/roles/db_master.yaml.jinja`
+
+(data-source-chains-raw-target)=
+##### Raw
+Chaining data sources for the raw renderer looks like this: `C@tplroot:variant_defaults|M@variant`. In this chain, the return dictionary of `salt["config.get"]("tplroot:variant_defaults")` is searched for keys defined in the mapdata value `variant`.
+
+For example, given
+
+* `salt["config.get"]("tplroot:variant_defaults")` returns `{"foo": {"config": "foo"}, "bar": {"config": "bar"}}` and
+* previous data sources caused the formula configuration `variant` to be set to `bar`,
+
+this data source chain returns `{"config": "bar"}`, which is merged on top of the output of previous ones.
+
 #### Default behavior
 
 The following data sources are used by default:
 
 ```yaml
-- defaults.yaml
-- Y:G@osarch
-- Y:G@os_family
-- Y:G@os
-- Y:G@osfinger
+- Y!P@defaults.yaml
+- Y!G@osarch
+- Y!G@os_family
+- Y!G@os
+- Y!G@osfinger
 - C@{{ tplroot }}
-- Y:G@id
+- Y!G@id
 ```
 
 A `vault` formula being executed on a Rocky Linux 9 minion called `vault1`, running on an x86-64 architecture, would thus try the following data sources in order and merge later results on top of previous ones:
@@ -74,7 +101,7 @@ Each formula provides its own [YAML data sources](yaml-data-source-target) in a 
 The `parameters/defaults.yaml` file provides the base formula configuration, ensuring sane defaults. It is always loaded.
 
 #### YAML data sources
-Inside the `parameters` directory, there are several subdirectories containing YAML configuration. This path structure allows to map minion metadata queries (usually grains/pillar lookups) to their results. For example, if a data source is defined as `Y:G@os`, a `parameters/os` directory should contain files such as `Debian.yaml`, `Fedora.yaml`.
+Inside the `parameters` directory, there are several subdirectories containing YAML configuration. This path structure allows to map minion metadata queries (usually grains/pillar lookups) to their results. For example, if a data source is defined as `Y!G@os`, a `parameters/os` directory should contain files such as `Debian.yaml`, `Fedora.yaml`.
 
 They are rendered as Jinja templates.
 
@@ -136,20 +163,20 @@ backup_paths: []
 
 Of course, the exact data to backup depends on the software that is running on the node. Which software is installed on your nodes is decided by assigning a `roles` pillar to the minion.
 
-It's possible to configure the `borgmatic` formula to consider your `roles` pillar for configuration layering. You can achieve this by creating a `map_jinja.yaml` file that overrides the default [data sources](matcher-def-target), adding a data source of `Y:I@roles`:
+It's possible to configure the `borgmatic` formula to consider your `roles` pillar for configuration layering. You can achieve this by creating a `map_jinja.yaml` file that overrides the default [data sources](matcher-def-target), adding a data source of `Y!I@roles`:
 
 ```yaml
 # either   salt://borgmatic/parameters/map_jinja.yaml[.jinja]   for formula-specific overrides
 # or       salt://parameters/map_jinja.yaml[.jinja]             for all formulae
 values:
   sources:
-    - Y:G@osarch
-    - Y:G@os_family
-    - Y:G@os
-    - Y:G@osfinger
+    - Y!G@osarch
+    - Y!G@os_family
+    - Y!G@os
+    - Y!G@osfinger
     - C@{{ tplroot }}
-    - Y:I@roles
-    - Y:G@id
+    - Y!I@roles
+    - Y!G@id
 ```
 
 A minion with `pillar["roles"] == ["gitea", "ci"]` would then take the following additional paths into account:
