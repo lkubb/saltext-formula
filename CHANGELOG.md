@@ -4,6 +4,19 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## 0.2.0 (2024-11-19)
+
+
+### Fixed
+
+- Fixed CLI invocation of map.data/map.stack/map.tofs
+
+
+### Added
+
+- Added map.tofs function to mimic libtofs.jinja
+
+
 ## 0.1.1 (2024-11-14)
 
 
