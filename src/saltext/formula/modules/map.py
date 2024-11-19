@@ -64,7 +64,6 @@ def __virtual__():
 def data(
     tpldir,
     sources=None,
-    *,
     parameter_dirs=None,
     config_get_strategy=None,
     default_merge_strategy=None,
@@ -237,7 +236,6 @@ def data(
 def stack(
     tpldir,
     sources,
-    *,
     parameter_dirs=None,
     default_values=None,
     default_merge_strategy=None,
@@ -356,7 +354,6 @@ def stack(
 def tofs(
     tpldir,
     source_files,
-    *,
     lookup=None,
     default_matchers=None,
     use_subpath=False,
