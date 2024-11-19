@@ -4,6 +4,15 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## 0.3.0 (2024-11-19)
+
+
+### Added
+
+- Added M/P/U matchers
+- Added matcher chains
+
+
 ## 0.2.0 (2024-11-19)
 
 
