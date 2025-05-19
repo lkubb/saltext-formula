@@ -79,19 +79,19 @@ The following data sources are used by default:
 
 A `vault` formula being executed on a Rocky Linux 9 minion called `vault1`, running on an x86-64 architecture, would thus try the following data sources in order and merge later results on top of previous ones:
 
-- `salt://borgmatic/parameters/defaults.yaml`
-- `salt://borgmatic/parameters/defaults.yaml.jinja`
-- `salt://borgmatic/parameters/osarch/x86_64.yaml`
-- `salt://borgmatic/parameters/osarch/x86_64.yaml.jinja`
-- `salt://borgmatic/parameters/os_family/RedHat.yaml`
-- `salt://borgmatic/parameters/os_family/RedHat.yaml.jinja`
-- `salt://borgmatic/parameters/os/Rocky Linux.yaml`
-- `salt://borgmatic/parameters/os/Rocky Linux.yaml.jinja`
-- `salt://borgmatic/parameters/osfinger/Rocky Linux-9.yaml`
-- `salt://borgmatic/parameters/osfinger/Rocky Linux-9.yaml.jinja`
-- `salt["`{py:func}`config.get <salt.modules.config.get>``"]("borgmatic")`
-- `salt://borgmatic/parameters/id/vault1.yaml`
-- `salt://borgmatic/parameters/id/vault1.yaml.jinja`
+- `salt://vault/parameters/defaults.yaml`
+- `salt://vault/parameters/defaults.yaml.jinja`
+- `salt://vault/parameters/osarch/x86_64.yaml`
+- `salt://vault/parameters/osarch/x86_64.yaml.jinja`
+- `salt://vault/parameters/os_family/RedHat.yaml`
+- `salt://vault/parameters/os_family/RedHat.yaml.jinja`
+- `salt://vault/parameters/os/Rocky Linux.yaml`
+- `salt://vault/parameters/os/Rocky Linux.yaml.jinja`
+- `salt://vault/parameters/osfinger/Rocky Linux-9.yaml`
+- `salt://vault/parameters/osfinger/Rocky Linux-9.yaml.jinja`
+- `salt["`{py:func}`config.get <salt.modules.config.get>``"]("vault")`
+- `salt://vault/parameters/id/vault1.yaml`
+- `salt://vault/parameters/id/vault1.yaml.jinja`
 
 ### `parameters` directory
 
