@@ -21,6 +21,10 @@ values: {}
 ### Templating
 YAML data sources are always rendered using the `jinja` renderer, meaning you have full access to all of Salt's functionality.
 
+:::{hint}
+This is true for both `.yaml.jinja` and plain `.yaml` files.
+:::
+
 Additionally, the following variables are provided:
 
 * `tplroot`: The formula root directory relative to the Salt fileserver root.
@@ -35,7 +39,7 @@ Suppose a formula installs `borg` from GitHub releases. It allows to set the `ve
 
 ```jinja
 {%- if mapdata.version == "latest" %}
-{%-   set latest_version = salt["http.query"](mapdata.lookup.latest_release_uri, decode=True, decode_type="json").dict.latest.version %}
+{%-   set latest_version = salt["http.query"](mapdata.lookup.latest_release_uri, decode=true, decode_type="json").dict.latest.version %}
 {%-   do mapdata.update({"version": latest_version}) %}
 {%- endif %}
 ```
@@ -84,16 +88,17 @@ values:
 ```
 
 (matcher-def-target)=
-## Data source definition
+## Layer definition
 
-Configuration source layers are specified usig a list of matcher definitions
-that decide where to pull the configuration from.
+A configuration layer is specified as a list of one or more matcher definitions
+that describe where to derive the configuration from and how to derive it.
 
-.. versionadded:: 0.3.0
-    These matcher definitions can each represent a chain, as shown in [Data source chains](data-source-chains-target).
+:::{versionadded} 0.3.0
+Multiple matcher definitions can be chained via the `|` separator. See [Data source chains](data-source-chains-target).
+:::
 
-### Spec (chain)
-A chain consists of one or more single matcher definitions: `[Y!]<single_def_0>[|<single_def_1>[|...]]`
+### Spec
+A data source describes a single configuration layer by chaining one or more matchers: `[Y!]<single_def_0>[|<single_def_1>[|...]]`
 
 `Y!` prefix
 :   Indicates that the returns of the following matchers should be used
@@ -103,12 +108,12 @@ A chain consists of one or more single matcher definitions: `[Y!]<single_def_0>[
 :   A [single matcher definition](spec-single-target). Multiple ones are separated by a `|`.
 
 (spec-single-target)=
-### Spec (single)
+### Single matcher spec
 
-Matcher definitions are structured like the following: `[<type>[:<option>[:<delimiter>]]@]<query>`
+A matcher definition references a lookup context and defines a lookup key: `[<type>[:<option>[:<delimiter>]]@]<query>`
 
 type
-:   The layer's configuration data source.
+:   The matcher lookup context. Defaults to `C`.
 
     `C`
     :   Query {py:func}`config.get <salt.modules.config.get>` and use its
@@ -123,7 +128,7 @@ type
         return as this layer's configuration.
 
     `P`
-    :   Specify that this query is a static one (represents a static path).
+    :   Specify that this query is a static one (represents a static path, technically: identity lookup).
 
     `M`
     :   Traverse the currently rendered configuration. Mostly useful in chains.
@@ -133,15 +138,19 @@ type
         enforcing specific overrides.
 
 option
-:   An option, valid values depend on the `type`.
+:   An option, valid values can depend on the `type`.
 
     This can be set to `SUB`, which nests the result inside the key defined by `query`
     instead of merging it into the stack root.
 
 delimiter
-:   Define a different delimiter for the query. This can be important on Windows
-    when loading YAML files since the path contains the `query` value and the default
-    delimiter is disallowed in paths on Windows. Defaults to `:`.
+:   The delimiter used in the `query` to separate nested keys. Defaults to `:`.
+
+    :::{hint}
+    Specifying a custom delimiter can be important when loading YAML files via the `Y!` prefix on Windows minions:
+    The rendered YAML path contains the `query` value and the default delimiter (`:`) is disallowed in paths on Windows.
+    Suggested replacement: `!`
+    :::
 
 query
 :   The value to look up with `type`.
@@ -151,11 +160,11 @@ query
 `I@mysql`
 :   Run `salt["pillar.get"]("mysql")` and merge the resulting dictionary into the stack.
 
-`Y!roles`
+`Y!C@roles`
 :   Run `salt["config.get"]("roles")`, build a list of paths, render and load
     the files and merge the resulting dictionary into the stack.
 
-    Shorthand: `roles`
+    Shorthands: `Y!roles`, `roles`
 
     For example, if a minion has a pillar value `roles` containing `[db, db_master]`,
     the following files relative to configurable directories are tried:
@@ -170,7 +179,7 @@ query
     :::
 
 `Y!I@roles`
-:   Does the same as `Y!roles`, but restricts the value source to the pillar.
+:   Does the same as `Y!C@roles`/`Y!roles`, but restricts the value source to the pillar.
 
 `Y!P@defaults.yaml`
 :   Don't query metadata, always load this static path as a YAML data source.

@@ -17,7 +17,6 @@ from typing import Callable
 from typing import Optional
 from typing import Union
 
-import salt.loader
 import salt.utils.yaml
 from salt.utils.data import traverse_dict_and_list as traverse
 from salt.utils.dictupdate import merge
@@ -89,8 +88,10 @@ def data(
     """
     Render formula configuration.
 
-    .. note::
+    .. hint::
+        This is the equivalent to ``map.jinja`` in the ``template-formula``.
 
+    .. note::
         This function is intended to be called from templates during the rendering
         of states, but it can be used for debugging/information purposes as well.
 
@@ -271,6 +272,9 @@ def stack(
     Takes a list of matcher definitions and renders the resulting layered
     configuration.
 
+    .. hint::
+        This is the equivalent to ``libmapstack.jinja`` in the ``template-formula``.
+
     CLI Example:
 
     .. code-block:: bash
@@ -342,6 +346,9 @@ def tofs(
     """
     Render a list of TOFS patterns to be used as an input to states that
     allow to specify multiple ``sources``, such as ``file.managed``.
+
+    .. hint::
+        This is the equivalent to ``libtofs.jinja`` in the ``template-formula``.
 
     .. note::
 
@@ -911,7 +918,7 @@ def _render_matcher_chain(
     return renderer
 
 
-def _render_matcher(matcher: str, for_path_rendering=False) -> tuple[Matcher, bool]:
+def _render_matcher(matcher: str, for_path_rendering: bool = False) -> tuple[Matcher, bool]:
     """
     Parse a single matcher definition into a Matcher and indicate whether its
     result should be parsed by loading a YAML file or directly.

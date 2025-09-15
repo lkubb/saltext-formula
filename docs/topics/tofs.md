@@ -1,6 +1,6 @@
 # TOFS Overview
 
-The Template Override/Files Switch pattern (TOFS) is an analog to Mapstack for managing files. It allows formula authors to provide possible file `sources` to states that are matched to minion metadata. The first URL that actually exists on the fileserver is selected. A formula can therefore provide environment-specific default files that users can easily override.
+The Template Override/Files Switch pattern (TOFS) is an analog to Mapstack for managing files. It allows formula authors to provide possible file `sources` to states that are matched to minion metadata. The first URL that actually exists on the fileserver is selected (exception: `file.recurse` allows to merge the contents of all existing directories in Salt 3008.0+). A formula can therefore provide environment-specific default files that users can easily override.
 
 ## Example
 For example, an `nginx` formula could provide the following files:

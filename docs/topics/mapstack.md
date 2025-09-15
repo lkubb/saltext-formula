@@ -36,33 +36,6 @@ A data source can also be one of the inbuilt global configuration dictionaries d
 
 Based on their hierarchy, all data source returns are merged into a single configuration dictionary.
 
-(data-source-chains-target)=
-#### Data source chains
-:::{versionadded} 0.3.0
-:::
-
-It's also possible to chain data sources using the `|` separator, where the syntax and behavior depends on whether the result will be loaded as a YAML file or not.
-
-(data-source-chains-yaml-target)=
-##### YAML
-Chaining data sources for the YAML renderer looks like this: `Y!G@os_family|I@roles`. Matcher returns are interpreted as path segments to a YAML file. A `mysql` formula running on a minion with `grains.os_family == "RedHat"` and `pillar["roles"] == ["db", "db_master"]` will look for the following YAML files to load:
-
-- `salt://mysql/parameters/os_family/RedHat/roles/db.yaml`
-- `salt://mysql/parameters/os_family/RedHat/roles/db.yaml.jinja`
-- `salt://mysql/parameters/os_family/RedHat/roles/db_master.yaml`
-- `salt://mysql/parameters/os_family/RedHat/roles/db_master.yaml.jinja`
-
-(data-source-chains-raw-target)=
-##### Raw
-Chaining data sources for the raw renderer looks like this: `C@tplroot:variant_defaults|M@variant`. In this chain, the return dictionary of `salt["config.get"]("tplroot:variant_defaults")` is searched for keys defined in the mapdata value `variant`.
-
-For example, given
-
-* `salt["config.get"]("tplroot:variant_defaults")` returns `{"foo": {"config": "foo"}, "bar": {"config": "bar"}}` and
-* previous data sources caused the formula configuration `variant` to be set to `bar`,
-
-this data source chain returns `{"config": "bar"}`, which is merged on top of the output of previous ones.
-
 #### Default behavior
 
 The following data sources are used by default:
@@ -92,6 +65,33 @@ A `vault` formula being executed on a Rocky Linux 9 minion called `vault1`, runn
 - `salt["`{py:func}`config.get <salt.modules.config.get>``"]("vault")`
 - `salt://vault/parameters/id/vault1.yaml`
 - `salt://vault/parameters/id/vault1.yaml.jinja`
+
+(data-source-chains-target)=
+#### Data source chains
+:::{versionadded} 0.3.0
+:::
+
+It's also possible to chain data sources using the `|` separator, where the behavior depends on whether the result will be loaded as a YAML file or not.
+
+(data-source-chains-yaml-target)=
+##### YAML
+Chaining data sources for the YAML renderer looks like this: `Y!G@os_family|I@roles`. Matcher returns are interpreted as path segments to a YAML file. A `mysql` formula running on a minion with `grains["os_family"] == "RedHat"` and `pillar["roles"] == ["db", "db_master"]` will look for the following YAML files to load:
+
+- `salt://mysql/parameters/os_family/RedHat/roles/db.yaml`
+- `salt://mysql/parameters/os_family/RedHat/roles/db.yaml.jinja`
+- `salt://mysql/parameters/os_family/RedHat/roles/db_master.yaml`
+- `salt://mysql/parameters/os_family/RedHat/roles/db_master.yaml.jinja`
+
+(data-source-chains-raw-target)=
+##### Raw
+Chaining data sources for the raw renderer looks like this: `C@tplroot:variant_defaults|M@variant`. In this chain, the return dictionary of `salt["config.get"]("tplroot:variant_defaults")` is searched for keys defined in the mapdata value `variant`.
+
+For example, given
+
+* `salt["config.get"]("tplroot:variant_defaults")` returns `{"foo": {"config": "foo"}, "bar": {"config": "bar"}}` and
+* previous data sources caused the formula configuration `variant` to be set to `bar`,
+
+this data source chain returns `{"config": "bar"}`, which is merged on top of the output of previous ones.
 
 ### `parameters` directory
 
@@ -215,4 +215,4 @@ backup_paths:
 ## Tips
 
 ### Overriding formula defaults
-Most formulae provide a `parameters/defaults.yaml`, which users should not modify. They can however create a custom `parameters/defaults.yaml.jinja`, which is merged on top of `defaults.yaml`. The same is true whan a formula provides other data sources, e.g. `os_family/Debian.yaml`.
+Most formulae provide a `parameters/defaults.yaml`, which users should not modify. They can however create a custom `parameters/defaults.yaml.jinja`, which is merged on top of `defaults.yaml`. The same is true when a formula provides other data sources, e.g. `os_family/Debian.yaml`.
