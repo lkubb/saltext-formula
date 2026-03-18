@@ -8,14 +8,12 @@ import itertools
 import logging
 import pickle
 from collections import ChainMap
+from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Sequence
 from itertools import chain
 from pathlib import Path
 from typing import Any
-from typing import Callable
-from typing import Optional
-from typing import Union
 
 import salt.utils.yaml
 from salt.utils.data import traverse_dict_and_list as traverse
@@ -494,7 +492,7 @@ class MatcherListResult(SlotsReprTrait):
     __slots__ = ("query", "values")
 
     query: str
-    values: Union[list[str], EllipsisType]
+    values: list[str] | EllipsisType
 
     def __init__(
         self,
@@ -522,16 +520,16 @@ class MatcherResult(SlotsReprTrait):
     __slots__ = ("query", "values", "merge_strategy", "merge_lists")
 
     query: str
-    values: Union[dict[Any, Any], EllipsisType]
-    merge_strategy: Optional[str]
-    merge_lists: Optional[bool]
+    values: dict[Any, Any] | EllipsisType
+    merge_strategy: str | None
+    merge_lists: bool | None
 
     def __init__(
         self,
         query: str,
-        values: Union[dict[Any, Any], EllipsisType] = ...,
-        strategy: Optional[str] = None,
-        merge_lists: Optional[bool] = None,
+        values: dict[Any, Any] | EllipsisType = ...,
+        strategy: str | None = None,
+        merge_lists: bool | None = None,
     ):
         self.query = query
         self.values = values
@@ -565,10 +563,10 @@ class RenderContext(SlotsReprTrait):
 
     stack: dict
     base_dirs: tuple[str, ...]
-    custom_data: dict[str, Union[list[str], dict]]
+    custom_data: dict[str, list[str] | dict]
     tpldir: str
     tplroot: str
-    config_get_strategy: Optional[str]
+    config_get_strategy: str | None
     merge_strategy: str
     merge_lists: bool
 
@@ -578,10 +576,10 @@ class RenderContext(SlotsReprTrait):
         base_dirs: tuple[str, ...],
         tpldir: str,
         tplroot: str,
-        custom_data: Optional[dict[str, Union[list[str], dict]]] = None,
-        config_get_strategy: Optional[str] = None,
-        merge_strategy: Optional[str] = "smart",
-        merge_lists: Optional[bool] = False,
+        custom_data: dict[str, list[str] | dict] | None = None,
+        config_get_strategy: str | None = None,
+        merge_strategy: str | None = "smart",
+        merge_lists: bool | None = False,
     ):
         self.stack = stack
         self.base_dirs = tuple(base_dirs)
@@ -614,9 +612,7 @@ class Matcher(SlotsReprTrait):
     options: tuple[str, ...]
     delimiter: str
 
-    def __init__(
-        self, query: str, options: Sequence[str] = (), delimiter: Optional[str] = ":", **_
-    ):
+    def __init__(self, query: str, options: Sequence[str] = (), delimiter: str | None = ":", **_):
         self.query = query
         self.delimiter = delimiter or ":"
         if not options or options == ("",):
@@ -777,7 +773,7 @@ class Renderer(SlotsReprTrait):
     def render_path(
         self,
         include_query: bool = True,
-        base_dirs: Optional[list[str]] = None,
+        base_dirs: list[str] | None = None,
         fallback_to_query: bool = False,
     ) -> list[str]:
         relative_parts = []
@@ -847,7 +843,7 @@ class YAMLRenderer(Renderer):
         return res
 
 
-def _concat_parts(*parts: Union[str, Iterable[str]]) -> str:
+def _concat_parts(*parts: str | Iterable[str]) -> str:
     # We don't want to account for the OS-specific path separator
     return "/".join(
         chain.from_iterable(
