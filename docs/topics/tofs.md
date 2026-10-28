@@ -1,15 +1,24 @@
 # TOFS Overview
 
-The Template Override/Files Switch pattern (TOFS) is an analog to Mapstack for managing files. It allows formula authors to provide possible file `sources` to states that are matched to minion metadata. The first URL that actually exists on the fileserver is selected (exception: `file.recurse` allows to merge the contents of all existing directories in Salt 3008.0+). A formula can therefore provide environment-specific default files that users can easily override.
+The Template Override/Files Switch pattern (TOFS) is an analog to
+Mapstack for managing files. It allows formula authors to provide
+possible file `sources` to states that are matched to minion metadata.
+The first URL that actually exists on the fileserver is selected
+(exception: `file.recurse` allows to merge the contents of all
+existing directories in Salt 3008.0+). A formula can therefore provide
+environment-specific default files that users can easily override.
 
 ## Example
+
 For example, an `nginx` formula could provide the following files:
 
 - `salt://nginx/files/os_family/Debian/nginx.conf.j2`
 - `salt://nginx/files/os_family/RedHat/nginx.conf.j2`
 - `salt://nginx/files/default/nginx.conf.j2`
 
-The following state would then render different file contents, depending on which OS it's rendered on, while giving users the option to override the source for a specific minion:
+The following state would then render different file contents,
+depending on which OS it's rendered on, while giving users the option
+to override the source for a specific minion:
 
 ```sls
 # For simplicity, we're not using mapstack in this example.
@@ -26,9 +35,13 @@ Manage nginx.conf:
       - salt://nginx/files/default/nginx.conf.j2
 ```
 
-Since hardcoding all possible sources in state files reduces flexibility and is repetitive, {py:func}`map.tofs <saltext.formula.modules.map.tofs>` provides a flexible and user-influencable way to generate the `sources` list.
+Since hardcoding all possible sources in state files reduces
+flexibility and is repetitive,
+{py:func}`map.tofs <saltext.formula.modules.map.tofs>` provides a
+flexible and user-influencable way to generate the `sources` list.
 
 ## How
+
 ```sls
 Manage nginx.conf:
   file.managed:
@@ -37,11 +50,20 @@ Manage nginx.conf:
 ```
 
 ## Differences to `libtofs.jinja`
-* By default, includes the query in file paths (`files/os_family/Debian` instead of `files/Debian`). This can be disabled via the `include_query` parameter.
-* Reads `tofs` configuration from all Mapstack sources (including YAML). Previously, this configuration could only be set in pillars/grains/opts.
-* Accepts matcher definitions, including chains, for file paths in the [same style as Mapstack](matcher-def-target) (`Y!` prefix is disallowed).
+
+- By default, includes the query in file paths
+  (`files/os_family/Debian` instead of `files/Debian`). This can be
+  disabled via the `include_query` parameter.
+- Reads `tofs` configuration from all Mapstack sources (including
+  YAML). Previously, this configuration could only be set in
+  pillars/grains/opts.
+- Accepts matcher definitions, including chains, for file paths in the
+  [same style as Mapstack](matcher-def-target) (`Y!` prefix is
+  disallowed).
 
 ## Reference
-This overview is currently very basic. For details, see the [original description][tofs-pattern].
+
+This overview is currently very basic. For details, see the
+[original description][tofs-pattern].
 
 [tofs-pattern]: https://github.com/saltstack-formulas/template-formula/blob/master/docs/TOFS_pattern.rst
