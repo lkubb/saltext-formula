@@ -282,13 +282,15 @@ def variant(param_dir):
             variant_name: True,
         }
     }
-    with pytest.helpers.temp_file(
-        "variant_selection.yaml", json.dumps(selection_contents), param_dir
-    ):
-        with pytest.helpers.temp_file(
+    with (
+        pytest.helpers.temp_file(
+            "variant_selection.yaml", json.dumps(selection_contents), param_dir
+        ),
+        pytest.helpers.temp_file(
             f"{variant_name}.yaml", json.dumps(variant_contents), param_dir / "variant"
-        ):
-            yield
+        ),
+    ):
+        yield
 
 
 @pytest.fixture(params=(True,))
@@ -863,14 +865,16 @@ def test_stack_yaml_jinja_context(map_mod, param_dir):
         "mapdata_available": "{{ mapdata.get('setting') == 'foo'}}",
         "custom_data_available": "{{ custom_data.get('foo') == 'foo'}}",
     }
-    with pytest.helpers.temp_file(
-        "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
-    ):
-        with pytest.helpers.temp_file(
+    with (
+        pytest.helpers.temp_file(
+            "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
+        ),
+        pytest.helpers.temp_file(
             "db.yaml.jinja", json.dumps({"values": contents_roles}), param_dir / "roles"
-        ):
-            custom_data = {"foo": "foo"}
-            res = map_mod.stack(tpldir, ["defaults.yaml", "Y:I@roles"], custom_data=custom_data)
+        ),
+    ):
+        custom_data = {"foo": "foo"}
+        res = map_mod.stack(tpldir, ["defaults.yaml", "Y:I@roles"], custom_data=custom_data)
     assert res == {
         "tpldir": tpldir,
         "tplroot": tpldir.split("/", maxsplit=1)[0],
@@ -894,19 +898,21 @@ def test_stack_yaml_meta_strategy(map_mod, param_dir, merge_strategy, default_me
             "value": False,
         }
     }
-    with pytest.helpers.temp_file(
-        "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
-    ):
-        with pytest.helpers.temp_file(
+    with (
+        pytest.helpers.temp_file(
+            "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
+        ),
+        pytest.helpers.temp_file(
             "db.yaml.jinja",
             json.dumps({"strategy": merge_strategy, "values": contents_roles}),
             param_dir / "roles",
-        ):
-            res = map_mod.stack(
-                "tplroot/foo/bar",
-                ["defaults.yaml", "Y:I@roles"],
-                default_merge_strategy=default_merge_strategy,
-            )
+        ),
+    ):
+        res = map_mod.stack(
+            "tplroot/foo/bar",
+            ["defaults.yaml", "Y:I@roles"],
+            default_merge_strategy=default_merge_strategy,
+        )
     if merge_strategy == "overwrite":
         assert res == {"nested": {"value": False}}
     else:
@@ -922,19 +928,21 @@ def test_stack_yaml_meta_merge_lists(map_mod, param_dir, merge_lists, default_me
     contents_roles = {
         "list": ["baz"],
     }
-    with pytest.helpers.temp_file(
-        "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
-    ):
-        with pytest.helpers.temp_file(
+    with (
+        pytest.helpers.temp_file(
+            "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
+        ),
+        pytest.helpers.temp_file(
             "db.yaml.jinja",
             json.dumps({"merge_lists": merge_lists, "values": contents_roles}),
             param_dir / "roles",
-        ):
-            res = map_mod.stack(
-                "tplroot/foo/bar",
-                ["defaults.yaml", "Y:I@roles"],
-                default_merge_lists=default_merge_lists,
-            )
+        ),
+    ):
+        res = map_mod.stack(
+            "tplroot/foo/bar",
+            ["defaults.yaml", "Y:I@roles"],
+            default_merge_lists=default_merge_lists,
+        )
     if merge_lists:
         assert res == {"list": ["foo", "bar", "baz"]}
     else:
