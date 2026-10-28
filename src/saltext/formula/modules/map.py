@@ -720,7 +720,7 @@ class StaticMatcher(Matcher):
 
 
 class Renderer(SlotsReprTrait):
-    __slots__ = ("_matchers", "render_context", "chain_finished")
+    __slots__ = ("_matchers", "chain_finished", "render_context")
 
     _matchers: list[Matcher]
     render_context: RenderContext
