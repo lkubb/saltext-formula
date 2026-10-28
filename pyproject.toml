@@ -77,6 +77,7 @@ dev_extra = [
     "black==26.10.1",
     "isort==9.0.2",
     "coverage==7.17.0",
+    "ty==0.0.92",
 ]
 docs = [
   "sphinx",
@@ -98,6 +99,7 @@ tests = [
     "pytest>=7.2.0",
     "pytest-salt-factories>=1.0.0",
     "pytest-instafail",
+    "typing-extensions>=4",
 ]
 
 [project.entry-points."salt.loader"]
@@ -179,6 +181,20 @@ showcontent = true
 directory = "fixed"
 name = "Fixed"
 showcontent = true
+
+[tool.ty.environment]
+# Ensure deterministic typechecking results regardless of the
+# development platform. Unix-only APIs (e.g. `pwd`, `os.getuid`) are
+# used behind runtime platform guards ty cannot narrow.
+python-platform = "linux"
+
+[tool.ty.rules]
+missing-type-argument = "error"
+possibly-unresolved-reference = "warn"
+
+[tool.ty.src]
+include = ["src", "tests"]
+exclude = ["docs/conf.py", "noxfile.py", "tools/"]
 
 [tool.coverage.run]
 branch = true

@@ -8,6 +8,7 @@ See there for documentation.
 """
 
 import logging
+import typing
 
 from salt.utils.functools import namespaced_function
 
@@ -18,7 +19,11 @@ from saltext.formula.modules.map import data
 from saltext.formula.modules.map import stack
 from saltext.formula.modules.map import tofs
 
-log = logging.getLogger(__name__)
+if typing.TYPE_CHECKING:
+    from saltext.formula.utils._types import SaltLogger
+    from saltext.formula.utils._types import __salt__  # noqa: TC004
+
+log: "SaltLogger" = logging.getLogger(__name__)  # type: ignore
 
 __virtualname__ = "map"
 
@@ -27,12 +32,14 @@ def __virtual__():
     return __virtualname__
 
 
-data = namespaced_function(data, globals())
-stack = namespaced_function(stack, globals())
-tofs = namespaced_function(tofs, globals())
-_concat_parts = namespaced_function(_concat_parts_base, globals())
-_render_matcher = namespaced_function(_render_matcher_base, globals())
-_render_matcher_chain = namespaced_function(_render_matcher_chain_base, globals())
+gdict = globals()
+
+data = namespaced_function(data, gdict)
+stack = namespaced_function(stack, gdict)
+tofs = namespaced_function(tofs, gdict)
+_concat_parts = namespaced_function(_concat_parts_base, gdict)
+_render_matcher = namespaced_function(_render_matcher_base, gdict)
+_render_matcher_chain = namespaced_function(_render_matcher_chain_base, gdict)
 
 
 for func, base in (
@@ -46,7 +53,7 @@ for func, base in (
     # Salt does not recognize them when using the CLI to call them.
     # Starting with Python 3.13, it's possible to pass `kwdefaults` to types.FunctionType
     if getattr(base, "__kwdefaults__", None) is not None:
-        func.__kwdefaults__ = base.__kwdefaults__.copy()
+        func.__kwdefaults__ = base.__kwdefaults__.copy()  # ty: ignore[unresolved-attribute]
 
 
 def _get_template(path, **kwargs):

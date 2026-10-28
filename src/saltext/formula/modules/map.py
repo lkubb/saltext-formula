@@ -11,16 +11,50 @@ import pickle
 from collections import ChainMap
 from collections.abc import Callable
 from collections.abc import Iterable
+from collections.abc import Mapping
 from collections.abc import Sequence
 from itertools import chain
 from pathlib import Path
 from types import EllipsisType
+from typing import TYPE_CHECKING
 from typing import Any
+from typing import Literal
+from typing import TypeAlias
+from typing import TypedDict
 
+import salt.utils.files
 import salt.utils.yaml
 from salt.utils.data import traverse_dict_and_list as traverse
 from salt.utils.dictupdate import merge
 from salt.utils.immutabletypes import freeze
+
+if TYPE_CHECKING:
+    from saltext.formula.utils._types import SaltLogger
+    from saltext.formula.utils._types import __context__  # noqa: TC004
+    from saltext.formula.utils._types import __salt__  # noqa: TC004
+
+MergeStrategy: TypeAlias = Literal["aggregate", "list", "overwrite", "recurse", "smart"]
+ConfigMergeStrategy: TypeAlias = Literal["overwrite", "recurse"]
+
+
+class StackConfig(TypedDict):
+    sources: Sequence[str]
+    parameter_dirs: Sequence[str]
+    config_get_strategy: ConfigMergeStrategy | None
+    default_merge_strategy: MergeStrategy | None
+    default_merge_lists: bool
+    post_map: str | Literal[False]
+    post_map_template: str
+    cache: bool
+
+
+class TofsConfig(TypedDict):
+    dirs: Mapping[Literal["default", "files"], str]
+    files_switch: Sequence[str]
+    include_query: bool
+    path_prefix: str
+    source_files: Mapping[str, Sequence[str]]
+
 
 DEFAULT_MATCHERS = (
     "Y!G@osarch",
@@ -57,7 +91,7 @@ QUERY_MAP = freeze(
 CKEY = "_formula_mapdata"
 
 
-log = logging.getLogger(__name__)
+log: "SaltLogger" = logging.getLogger(__name__)  # type: ignore
 
 __virtualname__ = "map"
 
@@ -67,16 +101,16 @@ def __virtual__():
 
 
 def data(
-    tpldir,
-    sources=None,
-    parameter_dirs=None,
-    config_get_strategy=None,
-    default_merge_strategy=None,
-    default_merge_lists=False,
-    post_map="post-map.jinja",
-    post_map_template="jinja",
-    cache=True,
-    custom_data=None,
+    tpldir: str,
+    sources: Sequence[str] | None = None,
+    parameter_dirs: Sequence[str] | None = None,
+    config_get_strategy: ConfigMergeStrategy | None = None,
+    default_merge_strategy: MergeStrategy | None = None,
+    default_merge_lists: bool = False,
+    post_map: str | Literal[False] = "post-map.jinja",
+    post_map_template: str = "jinja",
+    cache: bool = True,
+    custom_data: dict[Any, Any] | None = None,
 ):
     """
     Render formula configuration.
@@ -190,7 +224,7 @@ def data(
         __context__[CKEY] = {}
 
     if not cache or res_ckey not in __context__[CKEY]:
-        default_formula_config = {
+        default_formula_config: StackConfig = {
             "sources": list(sources),
             "parameter_dirs": list(parameter_dirs),
             # The following 3 were queried via salt["config.get"](f"{tplroot}:(strategy|merge_lists)")
@@ -252,14 +286,14 @@ def data(
 
 
 def stack(
-    tpldir,
-    sources,
-    parameter_dirs=None,
-    default_values=None,
-    default_merge_strategy=None,
-    default_merge_lists=None,
-    config_get_strategy=None,
-    custom_data=None,
+    tpldir: str,
+    sources: Sequence[str],
+    parameter_dirs: Sequence[str] | None = None,
+    default_values: StackConfig | None = None,
+    default_merge_strategy: MergeStrategy | None = None,
+    default_merge_lists: bool | None = None,
+    config_get_strategy: ConfigMergeStrategy | None = None,
+    custom_data: dict[Any, Any] | None = None,
 ):
     """
     Takes a list of matcher definitions and renders the resulting layered
@@ -324,17 +358,17 @@ def stack(
 
 
 def tofs(
-    tpldir,
-    source_files,
-    lookup=None,
-    default_matchers=None,
-    use_subpath=False,
-    include_query=True,
-    path_prefix=None,
-    files_dir="files",
-    default_dir="default",
-    config=None,
-    custom_data=None,
+    tpldir: str,
+    source_files: Sequence[str],
+    lookup: str | None = None,
+    default_matchers: Sequence[str] | None = None,
+    use_subpath: bool = False,
+    include_query: bool = True,
+    path_prefix: str | None = None,
+    files_dir: str = "files",
+    default_dir: str = "default",
+    config: Mapping[Any, Any] | None = None,
+    custom_data: dict[Any, Any] | None = None,
 ):
     """
     Render a list of TOFS patterns to be used as an input to states that
@@ -434,7 +468,9 @@ def tofs(
         "source_files": {},
         "include_query": include_query,
     }
-    tofs_config = ChainMap(config.get("tofs", {}), default_config)
+    tofs_config: TofsConfig = ChainMap(
+        config.get("tofs", {}), default_config
+    )  # ty: ignore[invalid-assignment]
 
     if lookup is not None:
         source_files = traverse(tofs_config, f"source_files:{lookup}", []) + source_files
@@ -484,10 +520,10 @@ class SlotsReprTrait:
 
 
 class MatcherListResult(SlotsReprTrait):
-    __slots__ = ("query", "values")
+    __slots__ = ("_values", "query")
 
     query: str
-    values: list[str] | EllipsisType
+    _values: list[str] | EllipsisType
 
     def __init__(
         self,
@@ -505,14 +541,20 @@ class MatcherListResult(SlotsReprTrait):
                 values = [str(name) for name in values]
             except TypeError:
                 values = [str(values)]
-        self.values = values
+        self._values = values
 
     def __bool__(self) -> bool:
-        return self.values is not ...
+        return self._values is not ...
+
+    @property
+    def values(self) -> list[str]:
+        if self._values is ...:
+            raise AttributeError("No values available")
+        return self._values
 
 
 class MatcherResult(SlotsReprTrait):
-    __slots__ = ("query", "values", "merge_strategy", "merge_lists")
+    __slots__ = ("merge_lists", "merge_strategy", "query", "values")
 
     query: str
     values: dict[Any, Any] | EllipsisType
@@ -546,19 +588,19 @@ class MatcherResult(SlotsReprTrait):
 
 class RenderContext(SlotsReprTrait):
     __slots__ = (
-        "stack",
         "base_dirs",
+        "config_get_strategy",
         "custom_data",
+        "merge_lists",
+        "merge_strategy",
+        "stack",
         "tpldir",
         "tplroot",
-        "config_get_strategy",
-        "merge_strategy",
-        "merge_lists",
     )
 
-    stack: dict
+    stack: dict[Any, Any]
     base_dirs: tuple[str, ...]
-    custom_data: dict[str, list[str] | dict]
+    custom_data: dict[Any, Any]
     tpldir: str
     tplroot: str
     config_get_strategy: str | None
@@ -567,16 +609,16 @@ class RenderContext(SlotsReprTrait):
 
     def __init__(
         self,
-        stack: dict,  # pylint: disable = redefined-outer-name
-        base_dirs: tuple[str, ...],
+        stack: Mapping[Any, Any],  # pylint: disable = redefined-outer-name
+        base_dirs: Sequence[str],
         tpldir: str,
         tplroot: str,
-        custom_data: dict[str, list[str] | dict] | None = None,
+        custom_data: dict[Any, Any] | None = None,
         config_get_strategy: str | None = None,
         merge_strategy: str | None = "smart",
         merge_lists: bool | None = False,
     ):
-        self.stack = stack
+        self.stack = dict(stack)
         self.base_dirs = tuple(base_dirs)
         self.tpldir = tpldir
         self.tplroot = tplroot
@@ -601,7 +643,7 @@ class RenderContext(SlotsReprTrait):
 
 
 class Matcher(SlotsReprTrait):
-    __slots__ = ("query", "options", "delimiter")
+    __slots__ = ("delimiter", "options", "query")
 
     query: str
     options: tuple[str, ...]
@@ -628,16 +670,20 @@ class Matcher(SlotsReprTrait):
 
     def value_list(self, **kwargs) -> MatcherListResult:
         res = self._fetch(**kwargs)
-        return MatcherListResult(query=res.query, values=res.values)
+        try:
+            values = res.values
+        except AttributeError:
+            values = ...
+        return MatcherListResult(query=res.query, values=values)
 
-    def _fetch(self, **_):
+    def _fetch(self, *, render_context: RenderContext, **_) -> MatcherResult:
         raise NotImplementedError
 
 
 class ConfigMatcher(Matcher):
     __slots__ = ("_config_get",)
 
-    _config_get: Callable
+    _config_get: Callable[..., Any]
 
     def __init__(self, *args, __salt__, **kwargs):
         super().__init__(*args, __salt__=__salt__, **kwargs)
@@ -645,7 +691,7 @@ class ConfigMatcher(Matcher):
         # don't have access to the loader dunders.
         self._config_get = __salt__["config.get"]
 
-    def _fetch(self, *, render_context, **_):  # pylint: disable=arguments-differ
+    def _fetch(self, *, render_context: RenderContext, **_) -> MatcherResult:
         values = self._config_get(
             self.query, ..., merge=render_context.config_get_strategy, delimiter=self.delimiter
         )
@@ -655,7 +701,7 @@ class ConfigMatcher(Matcher):
 class GrainsMatcher(Matcher):
     __slots__ = ("_grains_get",)
 
-    _grains_get: Callable
+    _grains_get: Callable[..., Any]
 
     def __init__(self, *args, __salt__, **kwargs):
         super().__init__(*args, __salt__=__salt__, **kwargs)
@@ -671,7 +717,7 @@ class GrainsMatcher(Matcher):
 class PillarMatcher(Matcher):
     __slots__ = ("_pillar_get", "_pillar_get_kwargs")
 
-    _pillar_get: Callable
+    _pillar_get: Callable[..., Any]
     _pillar_get_kwargs: dict[str, Any]
 
     def __init__(self, *args, __salt__, **kwargs):
@@ -697,13 +743,13 @@ class PillarMatcher(Matcher):
 
 
 class MapdataMatcher(Matcher):
-    def _fetch(self, *, render_context, **_):  # pylint: disable=arguments-differ
+    def _fetch(self, *, render_context: RenderContext, **_) -> MatcherResult:
         values = traverse(render_context.stack, self.query, ..., delimiter=self.delimiter)
         return MatcherResult.from_bare(self.query, values)
 
 
 class CustomMatcher(Matcher):
-    def _fetch(self, *, render_context, **_):  # pylint: disable=arguments-differ
+    def _fetch(self, *, render_context: RenderContext, **_) -> MatcherResult:
         values = traverse(render_context.custom_data, self.query, ..., delimiter=self.delimiter)
         return MatcherResult.from_bare(self.query, values)
 
@@ -764,7 +810,7 @@ class Renderer(SlotsReprTrait):
             intermittent = {}
             metadata = matcher.value_list(render_context=self.render_context)
             if not metadata:
-                return {}
+                return self.render_context
             for lookup in metadata.values:
                 intermittent = merge(
                     intermittent,
@@ -791,9 +837,9 @@ class Renderer(SlotsReprTrait):
                     return []
                 relative_parts.append([res.query])
             elif include_query:
-                relative_parts.append([_concat_parts(res.query, r) for r in res.values])  # type: ignore
+                relative_parts.append([_concat_parts(res.query, r) for r in res.values])
             else:
-                relative_parts.append(res.values)  # type: ignore
+                relative_parts.append(res.values)
         relative_paths = [_concat_parts(rel) for rel in itertools.product(*relative_parts)]
         absolute_paths = [
             _concat_parts(absolute)
@@ -807,9 +853,9 @@ class Renderer(SlotsReprTrait):
 class YAMLRenderer(Renderer):
     __slots__ = ("_get_template",)
 
-    _get_template: Callable
+    _get_template: Callable[..., str]
 
-    def __init__(self, render_context: RenderContext, _get_template: Callable):
+    def __init__(self, render_context: RenderContext, _get_template: Callable[..., str]):
         super().__init__(render_context)
         self._get_template = _get_template
 
@@ -850,7 +896,7 @@ class YAMLRenderer(Renderer):
         return res
 
 
-def _concat_parts(*parts: str | Iterable[str]) -> str:
+def _concat_parts(*parts: str | Sequence[str]) -> str:
     # We don't want to account for the OS-specific path separator
     return "/".join(
         chain.from_iterable(

@@ -1,14 +1,25 @@
 import contextlib
 import json
+from pathlib import Path
+from typing import TYPE_CHECKING
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+from saltfactories.utils.functional import Loaders
 
 from saltext.formula.modules import map as _map_mod
+from saltext.formula.modules.map import ConfigMergeStrategy
+from saltext.formula.modules.map import MergeStrategy
+from saltext.formula.utils._types import SaltLoader
+from tests._types import Yielder
+
+if TYPE_CHECKING:
+    from ty_extensions._internal import TypeOf
 
 
 @pytest.fixture(scope="module")
-def minion_config_overrides():
+def minion_config_overrides() -> dict[str, Any]:
     return {
         "tplroot": {
             "data_source": "opts",
@@ -55,7 +66,7 @@ def minion_config_overrides():
 
 
 @pytest.fixture(scope="module", autouse=True)
-def pillar(loaders):
+def pillar(loaders: Loaders) -> Yielder[dict[str, Any]]:
     pillar = {
         "roles": ["db", "db_master"],
         "nested": {
@@ -153,12 +164,12 @@ def pillar(loaders):
 
 
 @pytest.fixture
-def param_dir(state_tree):
+def param_dir(state_tree: Path) -> Path:
     return state_tree / "tplroot" / "parameters"
 
 
 @pytest.fixture
-def defaults_yaml(param_dir, request):
+def defaults_yaml(param_dir: Path, request: pytest.FixtureRequest):
     if getattr(request, "param", None) is False:
         ctx = contextlib.nullcontext()
     else:
@@ -169,13 +180,15 @@ def defaults_yaml(param_dir, request):
                 "defaults_yaml": True,
             }
         }
-        ctx = pytest.helpers.temp_file("defaults.yaml", json.dumps(contents), param_dir)
+        ctx = pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+            "defaults.yaml", json.dumps(contents), param_dir
+        )
     with ctx:
         yield
 
 
 @pytest.fixture
-def defaults_yaml_jinja(param_dir):
+def defaults_yaml_jinja(param_dir: Path) -> Yielder[None]:
     contents = {
         "values": {
             "data_source": "defaults_yaml_jinja",
@@ -183,12 +196,14 @@ def defaults_yaml_jinja(param_dir):
             "defaults_yaml_jinja": True,
         }
     }
-    with pytest.helpers.temp_file("defaults.yaml.jinja", json.dumps(contents), param_dir):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "defaults.yaml.jinja", json.dumps(contents), param_dir
+    ):
         yield
 
 
 @pytest.fixture
-def invalid_defaults_yaml(param_dir):
+def invalid_defaults_yaml(param_dir: Path) -> Yielder[None]:
     contents = {
         "booh": True,
         "strategy": "smart",
@@ -199,12 +214,14 @@ def invalid_defaults_yaml(param_dir):
             "defaults_yaml_jinja": True,
         },
     }
-    with pytest.helpers.temp_file("invalid_defaults.yaml", json.dumps(contents), param_dir):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "invalid_defaults.yaml", json.dumps(contents), param_dir
+    ):
         yield
 
 
 @pytest.fixture
-def global_defaults_yaml(state_tree, request):
+def global_defaults_yaml(state_tree: Path, request: pytest.FixtureRequest) -> Yielder[None]:
     if getattr(request, "param", None) is False:
         ctx = contextlib.nullcontext()
     else:
@@ -215,7 +232,7 @@ def global_defaults_yaml(state_tree, request):
                 "global_defaults_yaml": True,
             }
         }
-        ctx = pytest.helpers.temp_file(
+        ctx = pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "defaults.yaml", json.dumps(contents), state_tree / "parameters"
         )
     with ctx:
@@ -223,7 +240,9 @@ def global_defaults_yaml(state_tree, request):
 
 
 @pytest.fixture(params=(True,))
-def grains_os(param_dir, modules, request):
+def grains_os(
+    param_dir: Path, modules: SaltLoader, request: pytest.FixtureRequest
+) -> Yielder[bool]:
     if request.param:
         os = modules.grains.get("os")
     else:
@@ -236,12 +255,14 @@ def grains_os(param_dir, modules, request):
             "grains_os": True,
         }
     }
-    with pytest.helpers.temp_file(f"{os}.yaml", json.dumps(contents), param_dir / "os"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        f"{os}.yaml", json.dumps(contents), param_dir / "os"
+    ):
         yield request.param
 
 
 @pytest.fixture
-def grains_os_pillar_roles(param_dir, modules):
+def grains_os_pillar_roles(param_dir: Path, modules: SaltLoader) -> Yielder[None]:
     os = modules.grains.get("os")
     contents = {
         "values": {
@@ -250,12 +271,14 @@ def grains_os_pillar_roles(param_dir, modules):
             "grains_os_pillar_roles": True,
         }
     }
-    with pytest.helpers.temp_file("db.yaml", json.dumps(contents), param_dir / "os" / os / "roles"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "db.yaml", json.dumps(contents), param_dir / "os" / os / "roles"
+    ):
         yield
 
 
 @pytest.fixture
-def custom_users(param_dir):
+def custom_users(param_dir: Path) -> Yielder[None]:
     contents = {
         "values": {
             "data_source": "custom_users_testuser",
@@ -263,12 +286,14 @@ def custom_users(param_dir):
             "custom_users_testuser": True,
         }
     }
-    with pytest.helpers.temp_file("testuser.yaml", json.dumps(contents), param_dir / "users"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "testuser.yaml", json.dumps(contents), param_dir / "users"
+    ):
         yield
 
 
 @pytest.fixture
-def variant(param_dir):
+def variant(param_dir: Path) -> Yielder[None]:
     variant_name = "testvariant"
     selection_contents = {
         "values": {
@@ -283,10 +308,10 @@ def variant(param_dir):
         }
     }
     with (
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "variant_selection.yaml", json.dumps(selection_contents), param_dir
         ),
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             f"{variant_name}.yaml", json.dumps(variant_contents), param_dir / "variant"
         ),
     ):
@@ -294,7 +319,7 @@ def variant(param_dir):
 
 
 @pytest.fixture(params=(True,))
-def pillar_roles(param_dir, request):
+def pillar_roles(param_dir: Path, request: pytest.FixtureRequest) -> Yielder[bool]:
     if request.param:
         role = "db"
     else:
@@ -306,12 +331,14 @@ def pillar_roles(param_dir, request):
             "pillar_roles": True,
         }
     }
-    with pytest.helpers.temp_file(f"{role}.yaml", json.dumps(contents), param_dir / "roles"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        f"{role}.yaml", json.dumps(contents), param_dir / "roles"
+    ):
         yield request.param
 
 
 @pytest.fixture(params=(True,))
-def global_pillar_roles(state_tree, request):
+def global_pillar_roles(state_tree: Path, request: pytest.FixtureRequest) -> Yielder[bool]:
     if request.param:
         role = "db"
     else:
@@ -323,14 +350,14 @@ def global_pillar_roles(state_tree, request):
             "global_pillar_roles": True,
         }
     }
-    with pytest.helpers.temp_file(
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
         f"{role}.yaml", json.dumps(contents), state_tree / "parameters" / "roles"
     ):
         yield request.param
 
 
 @pytest.fixture(params=(True,))
-def opts_roles(param_dir, request):
+def opts_roles(param_dir: Path, request: pytest.FixtureRequest) -> Yielder[bool]:
     if request.param:
         role = "db"
     else:
@@ -342,12 +369,14 @@ def opts_roles(param_dir, request):
             "opts_roles": True,
         }
     }
-    with pytest.helpers.temp_file(f"{role}.yaml", json.dumps(contents), param_dir / "opts_roles"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        f"{role}.yaml", json.dumps(contents), param_dir / "opts_roles"
+    ):
         yield request.param
 
 
 @pytest.fixture(params=(True,))
-def pillar_roles_nested(param_dir, request):
+def pillar_roles_nested(param_dir: Path, request: pytest.FixtureRequest) -> Yielder[bool]:
     if request.param:
         role = "db"
     else:
@@ -359,12 +388,14 @@ def pillar_roles_nested(param_dir, request):
             "pillar_roles": True,
         }
     }
-    with pytest.helpers.temp_file(f"{role}.yaml", json.dumps(contents), param_dir / "nested!roles"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        f"{role}.yaml", json.dumps(contents), param_dir / "nested!roles"
+    ):
         yield request.param
 
 
 @pytest.fixture(params=(True,))
-def grains_id(param_dir, minion_id, request):
+def grains_id(param_dir: Path, minion_id: str, request: pytest.FixtureRequest) -> Yielder[bool]:
     if request.param:
         mid = minion_id
     else:
@@ -376,26 +407,30 @@ def grains_id(param_dir, minion_id, request):
             "grains_id": True,
         }
     }
-    with pytest.helpers.temp_file(f"{mid}.yaml", json.dumps(contents), param_dir / "id"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        f"{mid}.yaml", json.dumps(contents), param_dir / "id"
+    ):
         yield request.param
 
 
 @pytest.fixture
-def sources(request):
+def sources(request: pytest.FixtureRequest) -> list[str] | None:
     return getattr(request, "param", None)
 
 
 @pytest.fixture
-def map_jinja_yaml(param_dir, sources):
+def map_jinja_yaml(param_dir: Path, sources: list[str] | None) -> Yielder[None]:
     config = {}
     if sources is not None:
         config["sources"] = sources
-    with pytest.helpers.temp_file("map_jinja.yaml", json.dumps({"values": config}), param_dir):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "map_jinja.yaml", json.dumps({"values": config}), param_dir
+    ):
         yield
 
 
 @pytest.fixture
-def non_string_yaml(param_dir):
+def non_string_yaml(param_dir: Path) -> Yielder[None]:
     files = []
     for boolean in (False, True):
         for src in ("boolean", "boolean_list"):
@@ -407,7 +442,9 @@ def non_string_yaml(param_dir):
                 }
             }
             files.append(
-                pytest.helpers.temp_file(f"{boolean}.yaml", json.dumps(contents), param_dir / src)
+                pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+                    f"{boolean}.yaml", json.dumps(contents), param_dir / src
+                )
             )
     for integer in (4, 2):
         for src in ("integer", "integer_list"):
@@ -419,7 +456,9 @@ def non_string_yaml(param_dir):
                 }
             }
             files.append(
-                pytest.helpers.temp_file(f"{integer}.yaml", json.dumps(contents), param_dir / src)
+                pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+                    f"{integer}.yaml", json.dumps(contents), param_dir / src
+                )
             )
 
     with contextlib.ExitStack() as stack:
@@ -429,7 +468,8 @@ def non_string_yaml(param_dir):
 
 
 @pytest.fixture
-def map_mod(modules):
+def map_mod(modules: SaltLoader) -> "TypeOf[_map_mod]":
+    # ty: ignore[invalid-return-type] Gives better LSP completion, but is factually incorrect
     return modules.map
 
 
@@ -576,7 +616,7 @@ def map_mod(modules):
         ),
     ),
 )
-def test_stack_query(matchers, expected, map_mod):
+def test_stack_query(matchers: list[str], expected: dict[str, Any], map_mod: "TypeOf[_map_mod]"):
     custom_data = {
         "overrides": {
             "map": {
@@ -730,20 +770,24 @@ def test_stack_query(matchers, expected, map_mod):
         ),
     ),
 )
-def test_stack_yaml_and_query(matchers, expected, map_mod):
+def test_stack_yaml_and_query(
+    matchers: list[str], expected: dict[str, Any], map_mod: "TypeOf[_map_mod]"
+):
     custom_data = {"users": ["testuser", "testadmin"]}
     res = map_mod.stack("tplroot/foo/bar", matchers, custom_data=custom_data)
     assert res == expected
 
 
 @pytest.mark.usefixtures("invalid_defaults_yaml")
-def test_stack_yaml_invalid_return(map_mod):
+def test_stack_yaml_invalid_return(map_mod: "TypeOf[_map_mod]"):
     with pytest.raises(TypeError, match=".*invalid_defaults\\.yaml.*"):
         map_mod.stack("tplroot/foo/bar", ["invalid_defaults.yaml"])
 
 
-@pytest.mark.parametrize("config_get_strategy", (None, "merge"))
-def test_stack_yaml_config_get_strategy(config_get_strategy, map_mod):
+@pytest.mark.parametrize("config_get_strategy", (None, "recurse"))
+def test_stack_yaml_config_get_strategy(
+    config_get_strategy: ConfigMergeStrategy | None, map_mod: "TypeOf[_map_mod]"
+):
     res = map_mod.stack("tplroot/foo/bar", ["C@tplroot"], config_get_strategy=config_get_strategy)
     assert res["config_data_source"] == "opts"
 
@@ -853,12 +897,14 @@ def test_stack_yaml_config_get_strategy(config_get_strategy, map_mod):
     ),
     indirect=("defaults_yaml", "global_defaults_yaml", "pillar_roles", "global_pillar_roles"),
 )
-def test_stack_yaml_multiple_parameter_dirs(map_mod, dirs, matchers, expected):
+def test_stack_yaml_multiple_parameter_dirs(
+    map_mod: "TypeOf[_map_mod]", dirs: list[str], matchers: list[str], expected: dict[str, Any]
+):
     res = map_mod.stack("tplroot/foo/bar", matchers, parameter_dirs=dirs)
     assert res == expected
 
 
-def test_stack_yaml_jinja_context(map_mod, param_dir):
+def test_stack_yaml_jinja_context(map_mod: "TypeOf[_map_mod]", param_dir: Path):
     tpldir = "tplroot/foo/bar"
     contents_defaults = {"tpldir": "{{ tpldir }}", "tplroot": "{{ tplroot }}", "setting": "foo"}
     contents_roles = {
@@ -866,10 +912,10 @@ def test_stack_yaml_jinja_context(map_mod, param_dir):
         "custom_data_available": "{{ custom_data.get('foo') == 'foo'}}",
     }
     with (
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
         ),
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "db.yaml.jinja", json.dumps({"values": contents_roles}), param_dir / "roles"
         ),
     ):
@@ -886,7 +932,12 @@ def test_stack_yaml_jinja_context(map_mod, param_dir):
 
 @pytest.mark.parametrize("merge_strategy", ("smart", "overwrite"))
 @pytest.mark.parametrize("default_merge_strategy", (None, "smart", "overwrite"))
-def test_stack_yaml_meta_strategy(map_mod, param_dir, merge_strategy, default_merge_strategy):
+def test_stack_yaml_meta_strategy(
+    map_mod: "TypeOf[_map_mod]",
+    param_dir: Path,
+    merge_strategy: MergeStrategy,
+    default_merge_strategy: MergeStrategy | None,
+):
     contents_defaults = {
         "nested": {
             "value": True,
@@ -899,10 +950,10 @@ def test_stack_yaml_meta_strategy(map_mod, param_dir, merge_strategy, default_me
         }
     }
     with (
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
         ),
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "db.yaml.jinja",
             json.dumps({"strategy": merge_strategy, "values": contents_roles}),
             param_dir / "roles",
@@ -921,7 +972,9 @@ def test_stack_yaml_meta_strategy(map_mod, param_dir, merge_strategy, default_me
 
 @pytest.mark.parametrize("merge_lists", (False, True))
 @pytest.mark.parametrize("default_merge_lists", (None, False, True))
-def test_stack_yaml_meta_merge_lists(map_mod, param_dir, merge_lists, default_merge_lists):
+def test_stack_yaml_meta_merge_lists(
+    map_mod: "TypeOf[_map_mod]", param_dir: Path, merge_lists: bool, default_merge_lists: bool
+):
     contents_defaults = {
         "list": ["foo", "bar"],
     }
@@ -929,10 +982,10 @@ def test_stack_yaml_meta_merge_lists(map_mod, param_dir, merge_lists, default_me
         "list": ["baz"],
     }
     with (
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "defaults.yaml.jinja", json.dumps({"values": contents_defaults}), param_dir
         ),
-        pytest.helpers.temp_file(
+        pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
             "db.yaml.jinja",
             json.dumps({"merge_lists": merge_lists, "values": contents_roles}),
             param_dir / "roles",
@@ -953,8 +1006,13 @@ def test_stack_yaml_meta_merge_lists(map_mod, param_dir, merge_lists, default_me
 @pytest.mark.parametrize("grains_os", (False, True), indirect=True)
 @pytest.mark.parametrize("pillar_roles", (False, True), indirect=True)
 @pytest.mark.parametrize("grains_id", (False, True), indirect=True)
-@pytest.mark.parametrize("config_get_strategy", (None, "merge"))
-def test_data_defaults(grains_os, grains_id, config_get_strategy, map_mod):
+@pytest.mark.parametrize("config_get_strategy", (None, "recurse"))
+def test_data_defaults(
+    grains_os: bool,
+    grains_id: bool,
+    config_get_strategy: ConfigMergeStrategy,
+    map_mod: "TypeOf[_map_mod]",
+):
     res = map_mod.data("tplroot/foo/bar", config_get_strategy=config_get_strategy)
     yaml_sources = (
         ("defaults_yaml", True),
@@ -1001,11 +1059,13 @@ def test_data_defaults(grains_os, grains_id, config_get_strategy, map_mod):
 
 
 @pytest.mark.usefixtures("defaults_yaml")
-def test_data_post_map(map_mod, state_tree):
+def test_data_post_map(map_mod: "TypeOf[_map_mod]", state_tree: Path):
     contents = """\
         {% do mapdata.update({"data_source": "post_map", "foo": "bar"}) %}
         """
-    with pytest.helpers.temp_file("post-map.jinja", contents, state_tree / "tplroot"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "post-map.jinja", contents, state_tree / "tplroot"
+    ):
         res = map_mod.data("tplroot/foo/bar")
     for param, val in (
         ("data_source", "post_map"),
@@ -1017,12 +1077,14 @@ def test_data_post_map(map_mod, state_tree):
 
 
 @pytest.mark.usefixtures("defaults_yaml")
-def test_data_post_map_template(map_mod, state_tree):
+def test_data_post_map_template(map_mod: "TypeOf[_map_mod]", state_tree: Path):
     contents = """\
         def run():
             mapdata.update({"data_source": "post_map", "foo": "bar"})
         """
-    with pytest.helpers.temp_file("post-map.py", contents, state_tree / "tplroot"):
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
+        "post-map.py", contents, state_tree / "tplroot"
+    ):
         res = map_mod.data("tplroot/foo/bar", post_map="post-map.py", post_map_template="py")
     for param, val in (
         ("data_source", "post_map"),
@@ -1035,7 +1097,7 @@ def test_data_post_map_template(map_mod, state_tree):
 
 @pytest.mark.usefixtures("defaults_yaml")
 @pytest.mark.parametrize("cache", (False, True))
-def test_data_cache(map_mod, cache):
+def test_data_cache(map_mod: "TypeOf[_map_mod]", cache: bool):
     res = map_mod.data("tplroot/foo/bar", cache=cache)
     res2 = map_mod.data("tplroot/foo/bar", cache=cache)
     assert (res2 is res) is cache
