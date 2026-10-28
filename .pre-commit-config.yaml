@@ -201,6 +201,27 @@ repos:
           - nox==2026.10.20
           - uv==0.13.5 ; sys_platform == 'linux' or sys_platform == 'darwin' or sys_platform == 'win32'
 
+      # Local reimplementation of the astral-sh/ty-pre-commit hook, which unconditionally
+      # pins uv in `additional_dependencies`. This variant only installs the pin where
+      # uv ships wheels and otherwise relies on a locally installed uv (as above).
+      - id: ty
+        alias: typing
+        name: Typecheck Project
+        priority: 100
+        groups: [lint]
+        language: python
+        entry: uv check --quiet --preview-features=check-command --ty-version=0.0.92
+        args:
+          - --isolated
+          - --group=tests
+          - --extra=salt
+        types_or: [python, pyi]
+        pass_filenames: false
+        always_run: true
+        require_serial: true
+        additional_dependencies:
+          - uv==0.13.5 ; sys_platform == 'linux' or sys_platform == 'darwin' or sys_platform == 'win32'
+
       - id: zizmor
         name: Check actions and workflows
         priority: 40

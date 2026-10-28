@@ -1,3 +1,5 @@
+from types import ModuleType
+from typing import Any
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -7,10 +9,13 @@ from salt.modules import grains as grains_mod
 from salt.modules import pillar as pillar_mod
 
 import saltext.formula.modules.map as map_mod
+from src.saltext.formula.modules.map import Matcher
+from src.saltext.formula.modules.map import Renderer
+from tests._types import Yielder
 
 
 @pytest.fixture
-def grains():
+def grains() -> dict[str, Any]:
     return {
         "id": "testminion",
         "os": "Fedora",
@@ -25,7 +30,7 @@ def grains():
 
 
 @pytest.fixture
-def opts():
+def opts() -> dict[str, Any]:
     return {
         "roles_opts": ["opts_role_a", "opts_role_b"],
         "tplroot_opts": {"config": "data"},
@@ -34,7 +39,7 @@ def opts():
 
 
 @pytest.fixture
-def pillar():
+def pillar() -> dict[str, Any]:
     return {
         "roles_pillar": ["pillar_role_a", "pillar_role_b"],
         "tplroot_pillar": {"config": "data"},
@@ -43,17 +48,23 @@ def pillar():
 
 
 @pytest.fixture
-def context():
+def context() -> dict[Any, Any]:
     return {}
 
 
 @pytest.fixture
-def cp_get_template():
+def cp_get_template() -> MagicMock:
     return MagicMock()
 
 
 @pytest.fixture
-def configure_loader_modules(opts, grains, pillar, context, cp_get_template):
+def configure_loader_modules(
+    opts: dict[str, Any],
+    grains: dict[str, Any],
+    pillar: dict[str, Any],
+    context: dict[Any, Any],
+    cp_get_template: MagicMock,
+) -> dict[ModuleType, dict[str, dict[str, Any]]]:
     module_globals = {
         "__salt__": {
             "config.get": config_mod.get,
@@ -329,7 +340,9 @@ def configure_loader_modules(opts, grains, pillar, context, cp_get_template):
         ),
     ),
 )
-def test_render_matcher(matcher, cls, exp_yaml, attrs, value):
+def test_render_matcher(
+    matcher: str, cls: type[Matcher], exp_yaml: bool, attrs: dict[str, Any], value: Any
+):
     render_context = map_mod.RenderContext(
         stack={"variant": "foo"},
         base_dirs=["tplroot/parameters"],
@@ -337,18 +350,26 @@ def test_render_matcher(matcher, cls, exp_yaml, attrs, value):
         tplroot="tplroot",
         custom_data={"users": ["testuser"], "users_str": "testuser"},
     )
-    res, is_yaml = map_mod._render_matcher(matcher)
-    assert res.__class__ is cls
+    matcher_obj, is_yaml = map_mod._render_matcher(matcher)
+    assert matcher_obj.__class__ is cls
     assert is_yaml is exp_yaml
-    for attr, val in attrs.items():
-        assert getattr(res, attr) == val
+    for attr, res in attrs.items():
+        assert getattr(matcher_obj, attr) == res
     if exp_yaml:
-        assert res.value_list(render_context=render_context).values == value
+        list_res = matcher_obj.value_list(render_context=render_context)
+        if value is ...:
+            assert not list_res
+            return
+        assert list_res.values == value
     else:
         try:
-            assert res.value(render_context=render_context).values == value
+            res = matcher_obj.value(render_context=render_context)
         except NotImplementedError:
-            assert res.value_list(render_context=render_context).values == value
+            res = matcher_obj.value_list(render_context=render_context)
+        if value is ...:
+            assert not res
+        else:
+            assert res.values == value
 
 
 @pytest.mark.parametrize(
@@ -360,7 +381,7 @@ def test_render_matcher(matcher, cls, exp_yaml, attrs, value):
         ("C::!@selinux!enabled", ["True"]),
     ),
 )
-def test_render_matcher_for_path_rendering(matcher, expected):
+def test_render_matcher_for_path_rendering(matcher: str, expected: list[str]):
     render_context = map_mod.RenderContext(
         stack={},
         base_dirs=["tplroot/parameters"],
@@ -375,7 +396,7 @@ def test_render_matcher_for_path_rendering(matcher, expected):
 
 
 @pytest.mark.parametrize("matcher", ("defaults.yaml", "Y:C@roles_opts"))
-def test_render_matcher_for_path_rendering_yaml_disallowed(matcher):
+def test_render_matcher_for_path_rendering_yaml_disallowed(matcher: str):
     with pytest.raises(ValueError, match=f".*not allowed in this context.*{matcher}$"):
         map_mod._render_matcher(matcher, for_path_rendering=True)
 
@@ -398,7 +419,7 @@ def test_render_matcher_for_path_rendering_yaml_disallowed(matcher):
         ),
     ),
 )
-def test_render_matcher_chain(chain, typ, matchers):
+def test_render_matcher_chain(chain: str, typ: type[Renderer], matchers: list[Matcher]):
     render_context = map_mod.RenderContext(
         stack={"variant": "foo"},
         base_dirs=["tplroot/parameters"],
@@ -425,7 +446,7 @@ def test_render_matcher_chain(chain, typ, matchers):
         ("Y!G@os|C@roles_opts", True, "Cannot use YAML renderer for path rendering.*"),
     ),
 )
-def test_render_matcher_chain_disallowed(chain, for_path_rendering, msg):
+def test_render_matcher_chain_disallowed(chain: str, for_path_rendering: bool, msg: str):
     render_context = map_mod.RenderContext(
         stack={},
         base_dirs=["tplroot/parameters"],
@@ -436,7 +457,7 @@ def test_render_matcher_chain_disallowed(chain, for_path_rendering, msg):
         map_mod._render_matcher_chain(chain, render_context, for_path_rendering=for_path_rendering)
 
 
-def test_data_configuration_override(context, cp_get_template):
+def test_data_configuration_override(context: dict[Any, Any], cp_get_template: MagicMock):
     default_formula_config = {
         "sources": ["Y:C@foo"],
         "parameter_dirs": ["tplroot/params"],
@@ -452,7 +473,10 @@ def test_data_configuration_override(context, cp_get_template):
     }
     with patch("saltext.formula.modules.map.stack", autospec=True) as stack:
         stack.side_effect = (default_formula_config, {})
-        res = map_mod.data("tplroot/foo/bar", config_get_strategy="foobar")
+        # Arbitrary value, only passed through to mocked calls here
+        res = map_mod.data(
+            "tplroot/foo/bar", config_get_strategy="foobar"  # ty: ignore[invalid-argument-type]
+        )
 
     assert res == {"map_jinja": default_formula_config}
     assert stack.call_count == 2
@@ -474,7 +498,7 @@ def test_data_configuration_override(context, cp_get_template):
 
 
 @pytest.fixture
-def stack_mock():
+def stack_mock() -> Yielder[MagicMock]:
     def _stack(*args, default_values=None, **kwargs):  # pylint: disable=unused-argument
         return default_values or {}
 
@@ -483,7 +507,7 @@ def stack_mock():
 
 
 @pytest.mark.usefixtures("stack_mock")
-def test_data_no_post_map(cp_get_template):
+def test_data_no_post_map(cp_get_template: MagicMock):
     map_mod.data("tplroot/foo/bar", post_map=False)
     cp_get_template.assert_not_called()
 
@@ -798,7 +822,15 @@ def test_data_no_duplicate_defaults_yaml():
         ),
     ),
 )
-def test_tofs(matchers, path_prefix, files_dir, default_dir, use_subpath, include_query, expected):
+def test_tofs(
+    matchers: list[str] | None,
+    path_prefix: str | None,
+    files_dir: str | None,
+    default_dir: str | None,
+    use_subpath: bool,
+    include_query: bool,
+    expected: list[str],
+):
     res = map_mod.tofs(
         "tplroot/foo/bar",
         ["foo", "foo.jinja"],
@@ -891,7 +923,7 @@ def test_tofs_absolute_sources():
         ),
     ),
 )
-def test_tofs_override(overrides, expected):
+def test_tofs_override(overrides: dict[str, Any], expected: list[str]):
     res = map_mod.tofs(
         "tplroot/foo/bar",
         ["foo", "foo.jinja"],

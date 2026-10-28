@@ -1,8 +1,13 @@
 import contextlib
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+from saltfactories import cli
+from saltfactories.daemons.master import SaltMaster
+
+from tests._types import Yielder
 
 pytest.importorskip(
     "salt.version",
@@ -16,7 +21,7 @@ pytestmark = [
 
 
 @pytest.fixture(scope="module", autouse=True)
-def ssh_opts(master):
+def ssh_opts(master: SaltMaster) -> Yielder[None]:
     ssh_opts = {
         "ssh_minion_opts": {
             "tplroot": {
@@ -26,7 +31,7 @@ def ssh_opts(master):
             "roles": ["db", "db_master"],
         },
     }
-    with pytest.helpers.temp_file(
+    with pytest.helpers.temp_file(  # ty: ignore[unresolved-attribute]
         "ssh_opts.conf",
         json.dumps(ssh_opts),
         Path(master.config_dir) / "master.d",
@@ -35,7 +40,7 @@ def ssh_opts(master):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def formula_setup(master):
+def formula_setup(master: SaltMaster) -> Yielder[None]:
     param_files = {
         "defaults.yaml": (
             """\
@@ -73,7 +78,7 @@ def formula_setup(master):
 
 
 @pytest.fixture
-def post_map(master):
+def post_map(master: SaltMaster) -> Yielder[None]:
     contents = """\
         {%- do mapdata.update({"data_source": "post_map", "post_map": true}) %}
         """
@@ -82,7 +87,7 @@ def post_map(master):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _cp_wrapper(master, salt_ssh_cli):
+def _cp_wrapper(master: SaltMaster, salt_ssh_cli: cli.ssh.SaltSsh) -> Yielder[None]:
     # The wrapper returns minion paths.
     # Since we're testing on the same node, the path would exist
     # when running in the test suite, but not when running for real.
@@ -139,21 +144,21 @@ def _cp_wrapper(master, salt_ssh_cli):
         yield
 
 
-def test_data(salt_ssh_cli):
+def test_data(salt_ssh_cli: cli.ssh.SaltSsh):
     res = salt_ssh_cli.run("map.data", "tplroot/foo/bar")
     assert res.returncode == 0
     _assert_data(res.data, "db_yaml")
 
 
 @pytest.mark.usefixtures("post_map")
-def test_data_post_map(salt_ssh_cli):
+def test_data_post_map(salt_ssh_cli: cli.ssh.SaltSsh):
     res = salt_ssh_cli.run("map.data", "tplroot/foo/bar")
     assert res.returncode == 0
     _assert_data(res.data, "post_map", "post_map")
 
 
 @pytest.fixture
-def _state_data(master):
+def _state_data(master: SaltMaster) -> Yielder[str]:
     contents = """\
         foo:
           test.show_notification:
@@ -163,7 +168,7 @@ def _state_data(master):
         yield "tplroot._mapdata"
 
 
-def test_data_in_template(salt_ssh_cli, _state_data):
+def test_data_in_template(salt_ssh_cli: cli.ssh.SaltSsh, _state_data: str):
     res = salt_ssh_cli.run("state.show_sls", _state_data)
     assert res.returncode == 0
     assert res.data
@@ -171,14 +176,17 @@ def test_data_in_template(salt_ssh_cli, _state_data):
 
 
 @pytest.mark.usefixtures("post_map")
-def test_data_in_template_with_post_map(salt_ssh_cli, _state_data):
+def test_data_in_template_with_post_map(salt_ssh_cli: cli.ssh.SaltSsh, _state_data: str):
     res = salt_ssh_cli.run("state.show_sls", _state_data)
     assert res.returncode == 0
     assert res.data
     _assert_data(res.data, "post_map", "post_map", show_sls=True)
 
 
-def _assert_data(data, source, *extra_keys, show_sls=False):
+def _assert_data(
+    data: dict[str, Any] | None, source: str, *extra_keys: str, show_sls: bool = False
+):
+    assert data is not None
     if show_sls:
         for param in data["foo"]["test"]:
             if "text" not in param:

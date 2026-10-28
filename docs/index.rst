@@ -35,6 +35,7 @@ Heavily based on the excellent work done in the `template-formula <https://githu
 
   ref/modules/index
   ref/wrapper/index
+  ref/utils/index
 
 .. toctree::
   :maxdepth: 2
