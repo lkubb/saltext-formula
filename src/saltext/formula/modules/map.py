@@ -4,6 +4,7 @@ Provide helpers to render layered formula configuration.
 This is heavily based on the excellent work done in the `template-formula <https://github.com/saltstack-formulas/template-formula>`_.
 """
 
+import inspect
 import itertools
 import logging
 import pickle
@@ -13,19 +14,13 @@ from collections.abc import Iterable
 from collections.abc import Sequence
 from itertools import chain
 from pathlib import Path
+from types import EllipsisType
 from typing import Any
 
 import salt.utils.yaml
 from salt.utils.data import traverse_dict_and_list as traverse
 from salt.utils.dictupdate import merge
 from salt.utils.immutabletypes import freeze
-
-try:
-    from types import EllipsisType
-except ImportError:
-    # Python <3.10
-    EllipsisType = type(Ellipsis)  # type: ignore
-
 
 DEFAULT_MATCHERS = (
     "Y!G@osarch",
@@ -674,18 +669,30 @@ class GrainsMatcher(Matcher):
 
 
 class PillarMatcher(Matcher):
-    __slots__ = ("_pillar_get",)
+    __slots__ = ("_pillar_get", "_pillar_get_kwargs")
 
     _pillar_get: Callable
+    _pillar_get_kwargs: dict[str, Any]
 
     def __init__(self, *args, __salt__, **kwargs):
         super().__init__(*args, __salt__=__salt__, **kwargs)
         # This is used in the wrapper as well, where the methods
         # don't have access to the loader dunders.
         self._pillar_get = __salt__["pillar.get"]
+        self._pillar_get_kwargs = {}
+        # Salt 3008+ masks scalar values returned by pillar.get unless
+        # unmask is set. Older Salt and the Salt-SSH pillar wrapper
+        # don't support this parameter, hence check the signature.
+        try:
+            if "unmask" in inspect.signature(self._pillar_get).parameters:
+                self._pillar_get_kwargs["unmask"] = True
+        except (TypeError, ValueError):
+            pass
 
     def _fetch(self, **_):
-        values = self._pillar_get(self.query, ..., delimiter=self.delimiter)
+        values = self._pillar_get(
+            self.query, ..., delimiter=self.delimiter, **self._pillar_get_kwargs
+        )
         return MatcherResult.from_bare(self.query, values)
 
 

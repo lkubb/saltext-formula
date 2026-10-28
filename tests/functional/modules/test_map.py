@@ -137,7 +137,18 @@ def pillar(loaders):
     # We're patching the loaded pillar itself since reloading
     # it in functional tests does not work reliably (and takes more time
     # when it works).
-    with patch.dict(loaders.modules.pillar.loader.pack, {"__pillar__": pillar}):
+    # Since Salt 3008, minion_mods consists of two loaders: an outer one
+    # (dispatch) and an inner one that modules see as __salt__. Each has
+    # its own pack dict, so both need to be patched for the pillar data
+    # to be visible to functions called via __salt__ internally.
+    loader = loaders.modules.pillar.loader
+    packs = [loader.pack]
+    inner_pack = getattr(loader.pack.get("__salt__"), "pack", None)
+    if isinstance(inner_pack, dict) and inner_pack is not loader.pack:
+        packs.append(inner_pack)
+    with contextlib.ExitStack() as patches:
+        for pack in packs:
+            patches.enter_context(patch.dict(pack, {"__pillar__": pillar}))
         yield pillar
 
 
