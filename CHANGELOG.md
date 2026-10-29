@@ -4,6 +4,13 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## 0.3.1 (2026-10-29)
+
+
+### Fixed
+
+- Fixed compatibility with Salt 3008
+
 ## 0.3.0 (2024-11-19)
 
 
